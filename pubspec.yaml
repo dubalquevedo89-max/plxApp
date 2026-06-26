@@ -1,0 +1,85 @@
+name: plx_app
+description: Parcelux — Portal móvil de residentes y compradores (plxmap.com)
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.12.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
+  # State management
+  flutter_riverpod: ^3.3.2
+  riverpod_annotation: ^4.0.3
+
+  # Navigation
+  go_router: ^14.8.1
+
+  # HTTP & networking
+  dio: ^5.9.0
+
+  # Secure storage — JWT cifrado por tenant
+  flutter_secure_storage: ^9.2.2
+
+  # Local storage — TenantProfiles, caché urbanizaciones
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+
+  # Biometría — Face ID / huella (obligatorio antes de mostrar QR)
+  local_auth: ^2.3.0
+
+  # Theming dinámico por tenant (primary_color desde API)
+  flex_color_scheme: ^8.2.0
+
+  # Animaciones — QR countdown, transiciones
+  flutter_animate: ^4.5.2
+
+  # Serialization
+  freezed_annotation: ^3.1.0
+  json_annotation: ^4.9.0
+
+  # QR generation — pases de acceso a garita
+  qr_flutter: ^4.1.0
+
+  # File & image handling — comprobantes, documentos PDF
+  image_picker: ^1.1.2
+  file_picker: ^11.0.0
+
+  # Map rendering — GeoJSON masterplan PostGIS
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
+
+  # Environment variables
+  flutter_dotenv: ^5.2.1
+
+  # Utilities
+  intl: ^0.20.2
+  cached_network_image: ^3.4.1
+  url_launcher: ^6.3.1
+  connectivity_plus: ^6.1.1
+  package_info_plus: ^8.1.3
+  fl_chart: ^0.70.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+  # Code generation
+  build_runner: ^2.4.13
+  freezed: ^3.2.5
+  json_serializable: ^6.9.0
+  riverpod_generator: ^4.0.4
+
+flutter:
+  uses-material-design: true
+  assets:
+    - .env
+    - assets/images/
+    - assets/icons/
