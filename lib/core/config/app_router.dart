@@ -10,8 +10,18 @@ import '../../presentation/screens/qr_access/qr_access_screen.dart';
 import '../../presentation/screens/splash/splash_screen.dart';
 import '../../presentation/screens/alicuotas/alicuotas_screen.dart';
 import '../../presentation/screens/alicuotas/mis_propiedades_screen.dart';
+import '../../presentation/screens/documentos/documentos_screen.dart';
+import '../../presentation/screens/invitaciones/invitaciones_screen.dart';
+import '../../presentation/screens/notificaciones/notificaciones_screen.dart';
 import '../../presentation/screens/profile/profile_screen.dart';
+import '../../presentation/screens/tramites/tramites_screen.dart';
+import '../../presentation/screens/tramites/tramite_detalle_screen.dart';
 import '../../presentation/screens/urbanizaciones/urbanizaciones_screen.dart';
+import '../../presentation/screens/garita/validar_qr_screen.dart';
+import '../../presentation/screens/garita/accesos_screen.dart';
+import '../../presentation/screens/alertas/sos_screen.dart';
+import '../../presentation/screens/alertas/alertas_historial_screen.dart';
+import '../../presentation/screens/alertas/mis_alertas_screen.dart';
 
 part 'app_router.g.dart';
 
@@ -26,8 +36,16 @@ abstract class AppRoutes {
   static const misPropiedades = '/mis-propiedades';
   static const alicuotas = '/alicuotas';
   static const documentos = '/documentos';
+  static const invitaciones = '/invitaciones';
+  static const notificaciones = '/notificaciones';
+  static const tramites = '/tramites';
+  static const tramiteDetalle = '/tramites/:reservaId';
   static const profile = '/profile';
-  static const timeline = '/timeline/:reservaId';
+  static const validarQr = '/validar-qr';
+  static const accesos = '/accesos';
+  static const alertas = '/alertas';
+  static const alertasHistorial = '/alertas-historial';
+  static const misAlertas = '/mis-alertas';
 }
 
 @riverpod
@@ -82,29 +100,51 @@ GoRouter appRouter(Ref ref) {
         builder: (_, _) => const AlicuotasScreen(),
       ),
       GoRoute(
+        path: AppRoutes.invitaciones,
+        builder: (_, _) => const InvitacionesScreen(),
+      ),
+      GoRoute(
         path: AppRoutes.documentos,
-        builder: (_, _) => const _Placeholder('Documentos'),
+        builder: (_, _) => const DocumentosScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.notificaciones,
+        builder: (_, _) => const NotificacionesScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.tramites,
+        builder: (_, _) => const TramitesScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.tramiteDetalle,
+        builder: (_, state) => TramiteDetalleScreen(
+          reservaId: state.pathParameters['reservaId']!,
+        ),
       ),
       GoRoute(
         path: AppRoutes.profile,
         builder: (_, _) => const ProfileScreen(),
       ),
       GoRoute(
-        path: AppRoutes.timeline,
-        builder: (_, state) =>
-            _Placeholder('Timeline · ${state.pathParameters['reservaId']}'),
+        path: AppRoutes.validarQr,
+        builder: (_, _) => const ValidarQrScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.accesos,
+        builder: (_, _) => const AccesosScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.alertas,
+        builder: (_, _) => const SosScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.alertasHistorial,
+        builder: (_, _) => const AlertasHistorialScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.misAlertas,
+        builder: (_, _) => const MisAlertasScreen(),
       ),
     ],
   );
-}
-
-class _Placeholder extends StatelessWidget {
-  final String title;
-  const _Placeholder(this.title);
-
-  @override
-  Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: Text(title)),
-        body: Center(child: Text(title)),
-      );
 }

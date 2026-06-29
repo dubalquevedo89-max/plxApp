@@ -105,6 +105,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   bool _isSatellite = false;
   bool _searchOpen = false;
   String _searchQuery = '';
+  String _lastZoomedQuery = '';
 
   @override
   void dispose() {
@@ -226,6 +227,19 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 f.codigo.toLowerCase().contains(_searchQuery.toLowerCase());
             return statusOk && searchOk;
           }).toList();
+
+          // Auto-fit cuando el query cambia y hay resultados
+          if (_searchQuery.isNotEmpty &&
+              _searchQuery != _lastZoomedQuery &&
+              filtered.isNotEmpty) {
+            _lastZoomedQuery = _searchQuery;
+            WidgetsBinding.instance.addPostFrameCallback(
+                (_) => _zoomToFit(filtered));
+          } else if (_searchQuery.isEmpty && _lastZoomedQuery.isNotEmpty) {
+            _lastZoomedQuery = '';
+            WidgetsBinding.instance.addPostFrameCallback(
+                (_) => _zoomToFit(allFeatures));
+          }
 
           return Stack(
             children: [

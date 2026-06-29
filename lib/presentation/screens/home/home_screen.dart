@@ -9,82 +9,91 @@ import '../../../core/network/tenant_profile.dart';
 import '../../../core/storage/session_storage.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/notificacion_provider.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Watch the reactive provider so the screen rebuilds on profile switch
     final profile = ref.watch(activeProfileProvider);
+    debugPrint('[HOME] rol=${profile?.usuarioRol} isGuardia=${profile?.isGuardia}');
+    final pendientes = ref.watch(notificacionContadorProvider).when(
+          data: (c) => c.pendientes,
+          loading: () => 0,
+          error: (_, __) => 0,
+        );
 
     final theme = profile != null
         ? AppTheme.fromTenantColor(profile.primaryColor)
         : Theme.of(context);
 
+    final isGuardia = profile?.isGuardia ?? false;
+
     return Theme(
       data: theme,
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text(profile?.nombre ?? 'Parcelux'),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.person_outline),
-              onPressed: () => context.push(AppRoutes.profile),
+      child: isGuardia
+          ? _GuardiaHome(profile: profile)
+          : Scaffold(
+              appBar: AppBar(
+                title: Text(profile?.nombre ?? 'Parcelux'),
+                actions: [
+                  _ProfileSwitcherButton(currentProfile: profile),
+                ],
+              ),
+              body: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _WelcomeHeader(nombre: profile?.usuarioNombre ?? ''),
+                    const SizedBox(height: 20),
+                    _QrCard().animate().fadeIn(delay: 100.ms).slideY(begin: 0.1),
+                    const SizedBox(height: 24),
+                    Text('Módulos',
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleMedium
+                            ?.copyWith(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 12),
+                    _ModuleGrid(),
+                  ],
+                ),
+              ),
+              bottomNavigationBar: NavigationBar(
+                destinations: [
+                  const NavigationDestination(
+                      icon: Icon(Icons.home_outlined),
+                      selectedIcon: Icon(Icons.home),
+                      label: 'Inicio'),
+                  const NavigationDestination(
+                      icon: Icon(Icons.map_outlined),
+                      selectedIcon: Icon(Icons.map),
+                      label: 'Mapa'),
+                  NavigationDestination(
+                      icon: _NotifIcon(pendientes: pendientes),
+                      selectedIcon:
+                          _NotifIcon(pendientes: pendientes, selected: true),
+                      label: 'Notificaciones'),
+                  const NavigationDestination(
+                      icon: Icon(Icons.person_outline),
+                      selectedIcon: Icon(Icons.person),
+                      label: 'Perfil'),
+                ],
+                onDestinationSelected: (i) {
+                  switch (i) {
+                    case 1:
+                      context.push(AppRoutes.map,
+                          extra:
+                              SessionStorage.activeProfile?.toTenantOption());
+                    case 2:
+                      context.push(AppRoutes.notificaciones);
+                    case 3:
+                      context.push(AppRoutes.profile);
+                  }
+                },
+              ),
             ),
-            _ProfileSwitcherButton(currentProfile: profile),
-          ],
-        ),
-        body: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _WelcomeHeader(nombre: profile?.usuarioNombre ?? ''),
-              const SizedBox(height: 20),
-              _QrCard().animate().fadeIn(delay: 100.ms).slideY(begin: 0.1),
-              const SizedBox(height: 24),
-              Text('Módulos',
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleMedium
-                      ?.copyWith(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 12),
-              _ModuleGrid(),
-            ],
-          ),
-        ),
-        bottomNavigationBar: NavigationBar(
-          destinations: const [
-            NavigationDestination(
-                icon: Icon(Icons.home_outlined),
-                selectedIcon: Icon(Icons.home),
-                label: 'Inicio'),
-            NavigationDestination(
-                icon: Icon(Icons.map_outlined),
-                selectedIcon: Icon(Icons.map),
-                label: 'Mapa'),
-            NavigationDestination(
-                icon: Icon(Icons.receipt_long_outlined),
-                selectedIcon: Icon(Icons.receipt_long),
-                label: 'Alícuotas'),
-            NavigationDestination(
-                icon: Icon(Icons.folder_outlined),
-                selectedIcon: Icon(Icons.folder),
-                label: 'Docs'),
-          ],
-          onDestinationSelected: (i) {
-            switch (i) {
-              case 1:
-                context.push(AppRoutes.map);
-              case 2:
-                context.push(AppRoutes.alicuotas);
-              case 3:
-                context.push(AppRoutes.documentos);
-            }
-          },
-        ),
-      ),
     );
   }
 }
@@ -472,6 +481,48 @@ class _Fallback extends StatelessWidget {
       );
 }
 
+// ── Notification icon with badge ──────────────────────────────────────────────
+
+class _NotifIcon extends StatelessWidget {
+  final int pendientes;
+  final bool selected;
+  const _NotifIcon({required this.pendientes, this.selected = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Icon(selected
+            ? Icons.notifications
+            : Icons.notifications_outlined),
+        if (pendientes > 0)
+          Positioned(
+            right: -6,
+            top: -4,
+            child: Container(
+              padding: const EdgeInsets.all(3),
+              decoration: const BoxDecoration(
+                color: Colors.red,
+                shape: BoxShape.circle,
+              ),
+              constraints:
+                  const BoxConstraints(minWidth: 16, minHeight: 16),
+              child: Text(
+                pendientes > 99 ? '99+' : '$pendientes',
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 9,
+                    fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
 // ── Existing widgets ──────────────────────────────────────────────────────────
 
 class _WelcomeHeader extends StatelessWidget {
@@ -544,9 +595,9 @@ class _QrCard extends ConsumerWidget {
   }
 }
 
-class _ModuleGrid extends StatelessWidget {
+class _ModuleGrid extends ConsumerWidget {
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final items = [
       _ModuleItem(
           icon: Icons.home_work_outlined,
@@ -554,38 +605,51 @@ class _ModuleGrid extends StatelessWidget {
           route: AppRoutes.misPropiedades),
       _ModuleItem(
           icon: Icons.receipt_long_outlined,
-          label: 'Alícuotas',
+          label: 'Mis Pagos',
           route: AppRoutes.alicuotas),
       _ModuleItem(
           icon: Icons.group_add_outlined,
           label: 'Invitaciones',
-          route: AppRoutes.home),
+          route: AppRoutes.invitaciones),
+      _ModuleItem(
+          icon: Icons.timeline_outlined,
+          label: 'Mis Trámites',
+          route: AppRoutes.tramites),
       _ModuleItem(
           icon: Icons.folder_shared_outlined,
           label: 'Documentos',
           route: AppRoutes.documentos),
       _ModuleItem(
-          icon: Icons.timeline_outlined,
-          label: 'Mi Trámite',
-          route: AppRoutes.home),
-      _ModuleItem(
-          icon: Icons.map_outlined, label: 'Plano', route: AppRoutes.map),
+          icon: Icons.sos_rounded,
+          label: 'Alertas',
+          route: AppRoutes.alertas,
+          color: Colors.red),
     ];
 
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        crossAxisSpacing: 10,
-        mainAxisSpacing: 10,
-        childAspectRatio: 0.9,
-      ),
-      itemCount: items.length,
-      itemBuilder: (context, i) => items[i]
-          .animate()
-          .fadeIn(delay: (i * 60 + 200).ms)
-          .scale(begin: const Offset(0.85, 0.85)),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const columns = 3;
+        const spacing = 10.0;
+        final itemWidth =
+            (constraints.maxWidth - spacing * (columns - 1)) / columns;
+
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          alignment: WrapAlignment.center,
+          children: List.generate(
+            items.length,
+            (i) => SizedBox(
+              width: itemWidth,
+              height: itemWidth / 0.9,
+              child: items[i]
+                  .animate()
+                  .fadeIn(delay: (i * 60 + 200).ms)
+                  .scale(begin: const Offset(0.85, 0.85)),
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -594,11 +658,13 @@ class _ModuleItem extends StatelessWidget {
   final IconData icon;
   final String label;
   final String route;
+  final Color? color;
   const _ModuleItem(
-      {required this.icon, required this.label, required this.route});
+      {required this.icon, required this.label, required this.route, this.color});
 
   @override
   Widget build(BuildContext context) {
+    final iconColor = color ?? Theme.of(context).colorScheme.primary;
     return Card(
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
@@ -608,9 +674,7 @@ class _ModuleItem extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon,
-                  size: 32,
-                  color: Theme.of(context).colorScheme.primary),
+              Icon(icon, size: 32, color: iconColor),
               const SizedBox(height: 8),
               Text(label,
                   textAlign: TextAlign.center,
@@ -621,5 +685,185 @@ class _ModuleItem extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+// ── Guardia home ──────────────────────────────────────────────────────────────
+
+class _GuardiaHome extends ConsumerWidget {
+  final TenantProfile? profile;
+  const _GuardiaHome({this.profile});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final primary = Theme.of(context).colorScheme.primary;
+    final pendientes = ref.watch(notificacionContadorProvider).when(
+          data: (c) => c.pendientes,
+          loading: () => 0,
+          error: (_, __) => 0,
+        );
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(profile?.nombre ?? 'Parcelux'),
+        actions: [
+          _ProfileSwitcherButton(currentProfile: profile),
+        ],
+      ),
+      bottomNavigationBar: NavigationBar(
+        destinations: [
+          const NavigationDestination(
+              icon: Icon(Icons.home_outlined),
+              selectedIcon: Icon(Icons.home),
+              label: 'Inicio'),
+          const NavigationDestination(
+              icon: Icon(Icons.map_outlined),
+              selectedIcon: Icon(Icons.map),
+              label: 'Mapa'),
+          NavigationDestination(
+              icon: _NotifIcon(pendientes: pendientes),
+              selectedIcon: _NotifIcon(pendientes: pendientes, selected: true),
+              label: 'Notificaciones'),
+          const NavigationDestination(
+              icon: Icon(Icons.person_outline),
+              selectedIcon: Icon(Icons.person),
+              label: 'Perfil'),
+        ],
+        onDestinationSelected: (i) {
+          switch (i) {
+            case 1:
+              context.push(AppRoutes.map,
+                  extra: SessionStorage.activeProfile?.toTenantOption());
+            case 2:
+              context.push(AppRoutes.notificaciones);
+            case 3:
+              context.push(AppRoutes.profile);
+          }
+        },
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _WelcomeHeader(nombre: profile?.usuarioNombre ?? ''),
+            const SizedBox(height: 20),
+
+            // Banner principal: Validar acceso QR
+            Card(
+              color: primary,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: () => context.push(AppRoutes.validarQr),
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.qr_code_scanner_rounded,
+                          color: Colors.white, size: 48),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Validar acceso QR',
+                                style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16)),
+                            const SizedBox(height: 4),
+                            Text('Escanea el código QR del residente o visita',
+                                style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.85),
+                                    fontSize: 13)),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.arrow_forward_ios_rounded,
+                          color: Colors.white, size: 16),
+                    ],
+                  ),
+                ),
+              ),
+            ).animate().fadeIn(delay: 100.ms).slideY(begin: 0.1),
+
+            const SizedBox(height: 24),
+            Text('Módulos',
+                style: Theme.of(context)
+                    .textTheme
+                    .titleMedium
+                    ?.copyWith(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+
+            // Módulos centrados (2)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _GuardiaModule(
+                  icon: Icons.history_rounded,
+                  label: 'Accesos',
+                  color: primary,
+                  onTap: () => context.push(AppRoutes.accesos),
+                  delay: 200,
+                ),
+                const SizedBox(width: 16),
+                _GuardiaModule(
+                  icon: Icons.notifications_active_rounded,
+                  label: 'Alertas',
+                  color: Colors.orange,
+                  onTap: () => context.push(AppRoutes.alertasHistorial),
+                  delay: 260,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _GuardiaModule extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+  final int delay;
+
+  const _GuardiaModule({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+    required this.delay,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 140,
+      height: 140,
+      child: Card(
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, size: 40, color: color),
+                const SizedBox(height: 10),
+                Text(label,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w600)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ).animate().fadeIn(delay: Duration(milliseconds: delay)).scale(
+        begin: const Offset(0.85, 0.85));
   }
 }

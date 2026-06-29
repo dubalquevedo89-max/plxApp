@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../core/network/dio_client.dart';
+import '../../core/services/push_notification_service.dart';
 import '../../data/datasources/remote/auth_datasource.dart';
 import '../../data/datasources/remote/reserva_datasource.dart';
 import '../../domain/entities/reserva_result.dart';
@@ -8,7 +9,7 @@ import 'auth_provider.dart';
 
 part 'reserva_flow_provider.g.dart';
 
-enum ReservaStep { form, creatingAccount, loggingIn, reserving, done, error, loginExisting }
+enum ReservaStep { form, creatingAccount, loggingIn, requestingPermission, reserving, done, error, loginExisting }
 
 class ReservaFlowState {
   final ReservaStep step;
@@ -83,7 +84,19 @@ class ReservaFlow extends _$ReservaFlow {
             virtualProjectSlug: virtualProjectSlug,
           );
 
-      // Step 3: Pre-reservar
+      // Step 3: Permisos de notificaciones (obligatorio)
+      state = state.copyWith(step: ReservaStep.requestingPermission);
+      final granted = await PushNotificationService.requestAndCheckPermission();
+      if (!granted) {
+        state = state.copyWith(
+          step: ReservaStep.error,
+          errorMessage: 'Para completar la reserva debes permitir las notificaciones. '
+              'Son necesarias para recibir actualizaciones de tu trámite.',
+        );
+        return;
+      }
+
+      // Step 4: Pre-reservar
       state = state.copyWith(step: ReservaStep.reserving);
       final storageKey =
           virtualProjectSlug != null ? '$virtualProjectSlug@$host' : host;
@@ -135,6 +148,18 @@ class ReservaFlow extends _$ReservaFlow {
             virtualProjectSlug: virtualProjectSlug,
           );
 
+      // Permisos de notificaciones (obligatorio)
+      state = state.copyWith(step: ReservaStep.requestingPermission);
+      final granted = await PushNotificationService.requestAndCheckPermission();
+      if (!granted) {
+        state = state.copyWith(
+          step: ReservaStep.error,
+          errorMessage: 'Para completar la reserva debes permitir las notificaciones. '
+              'Son necesarias para recibir actualizaciones de tu trámite.',
+        );
+        return;
+      }
+
       state = state.copyWith(step: ReservaStep.reserving);
       final storageKey =
           virtualProjectSlug != null ? '$virtualProjectSlug@$host' : host;
@@ -160,7 +185,8 @@ class ReservaFlow extends _$ReservaFlow {
   bool _isEmailExists(Object e) {
     if (e is DioException) {
       final status = e.response?.statusCode;
-      final detail = (e.response?.data as Map?)?['detail']?.toString().toLowerCase() ?? '';
+      final data = e.response?.data;
+      final detail = data is Map ? (data['detail']?.toString().toLowerCase() ?? '') : '';
       if (status == 400 || status == 409) return true;
       if (detail.contains('registrado') || detail.contains('already') || detail.contains('existe')) {
         return true;
@@ -178,6 +204,7 @@ class ReservaFlow extends _$ReservaFlow {
       final status = e.response?.statusCode;
       if (status == 401) return 'Contraseña incorrecta. Inténtalo de nuevo.';
       if (status == 422) return 'Datos inválidos. Verifica el formulario.';
+      if (status != null && status >= 500) return 'El servidor no está disponible. Inténtalo más tarde.';
     }
     final str = e.toString().toLowerCase();
     if (str.contains('connection') || str.contains('socket')) {

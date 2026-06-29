@@ -31,37 +31,59 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     _checkActiveSession();
   }
 
+  Future<void> _goHome() async {
+    await ref.read(authRepositoryProvider).refreshActiveProfile();
+    if (!mounted) return;
+    ref.invalidate(activeProfileProvider);
+    final profile = SessionStorage.activeProfile;
+    final tenantNombre = widget.tenant.nombre;
+    final profileNombre = profile?.nombre;
+    context.go(AppRoutes.home);
+    if (profileNombre != null && profileNombre != tenantNombre) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Tu perfil pertenece a "$profileNombre". Fuiste redirigido automáticamente.',
+          ),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 5),
+        ),
+      );
+    }
+  }
+
   Future<void> _checkActiveSession() async {
     final t = widget.tenant;
-    // Key used when this tenant has a session
     final key = t.isVirtualProject
         ? '${t.virtualProjectSlug}@${t.host}'
         : t.host;
     final jwt = await SessionStorage.getJwt(key);
     if (jwt != null && mounted) {
-      // Activate this tenant's session and go home
       await SessionStorage.switchProfile(key);
-      if (mounted) context.go(AppRoutes.home);
+      await _goHome();
       return;
     }
     _tryBiometricLogin();
   }
 
   Future<void> _tryBiometricLogin() async {
-    final host = widget.tenant.host;
-    final existing = SessionStorage.getProfile(host);
+    final t = widget.tenant;
+    final key = t.isVirtualProject
+        ? '${t.virtualProjectSlug}@${t.host}'
+        : t.host;
+    final existing = SessionStorage.getProfile(key);
     if (existing == null) return;
-    final jwt = await SessionStorage.getJwt(host);
+    final jwt = await SessionStorage.getJwt(key);
     if (jwt == null) return;
     final canCheck = await _localAuth.canCheckBiometrics;
     if (!canCheck || !mounted) return;
     final ok = await _localAuth.authenticate(
-      localizedReason: 'Accede a ${widget.tenant.nombre}',
+      localizedReason: 'Accede a ${t.nombre}',
       options: const AuthenticationOptions(biometricOnly: true),
     );
     if (ok && mounted) {
-      await SessionStorage.switchProfile(host);
-      if (mounted) context.go(AppRoutes.home);
+      await SessionStorage.switchProfile(key);
+      await _goHome();
     }
   }
 
@@ -75,12 +97,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           primaryColor: t.primaryColor,
           logoUrl: t.logoUrl,
           virtualProjectSlug: t.virtualProjectSlug,
-          displayNombre: t.nombre,
+          displayNombre: t.isVirtualProject ? t.nombre : null,
         );
     if (!mounted) return;
     final state = ref.read(authProvider);
     if (state.hasValue && state.value != null) {
-      context.go(AppRoutes.home);
+      await _goHome();
     }
   }
 
@@ -214,17 +236,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ],
                       ),
                     ).animate().fadeIn().shake(),
-                  FilledButton(
-                    onPressed: isLoading ? null : _submit,
-                    child: isLoading
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                                strokeWidth: 2, color: Colors.white),
-                          )
-                        : const Text('Ingresar'),
-                  ).animate().fadeIn(delay: 350.ms),
+                  Center(
+                    child: FilledButton(
+                      onPressed: isLoading ? null : _submit,
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size(220, 52),
+                        textStyle: const TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.w600),
+                      ),
+                      child: isLoading
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: Colors.white),
+                            )
+                          : const Text('Ingresar'),
+                    ).animate().fadeIn(delay: 350.ms),
+                  ),
                   if (t.masterplanAppEnabled) ...[
                     const SizedBox(height: 20),
                     _MasterplanBanner(

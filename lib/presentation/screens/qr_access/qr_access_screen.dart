@@ -3,9 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:local_auth/local_auth.dart';
-import 'package:qr_flutter/qr_flutter.dart';
+import '../../../core/network/dio_client.dart';
 import '../../../core/storage/session_storage.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../data/datasources/remote/garita_datasource.dart';
+import '../../../domain/entities/solvencia.dart';
+import '../../widgets/qr_with_logo.dart';
 
 class QrAccessScreen extends ConsumerStatefulWidget {
   const QrAccessScreen({super.key});
@@ -21,6 +24,8 @@ class _QrAccessScreenState extends ConsumerState<QrAccessScreen> {
   bool _authenticating = false;
   int _remaining = _totalSeconds;
   Timer? _timer;
+  String? _qrData;
+  Solvencia? _solvencia;
 
   @override
   void initState() {
@@ -31,18 +36,67 @@ class _QrAccessScreenState extends ConsumerState<QrAccessScreen> {
   Future<void> _authenticate() async {
     setState(() => _authenticating = true);
     try {
-      final ok = await _localAuth.authenticate(
-        localizedReason: 'Verifica tu identidad para ver el pase QR',
-        options: const AuthenticationOptions(biometricOnly: false),
-      );
+      final canCheck = await _localAuth.canCheckBiometrics ||
+          await _localAuth.isDeviceSupported();
+
+      bool ok;
+      if (canCheck) {
+        ok = await _localAuth.authenticate(
+          localizedReason: 'Verifica tu identidad para ver el pase QR',
+          options: const AuthenticationOptions(biometricOnly: false),
+        );
+      } else {
+        // Dispositivo sin autenticación configurada → permitir acceso directo
+        ok = true;
+      }
+
+      if (!mounted) return;
       if (ok) {
+        _qrData = await _fetchResidentCode();
         _startCountdown();
         setState(() => _authenticated = true);
-      } else if (mounted) {
+      } else {
         Navigator.of(context).pop();
+      }
+    } catch (e) {
+      if (!mounted) return;
+      // Error de plataforma (ej. biometría no disponible en este dispositivo)
+      // Intentar acceder sin autenticación biométrica
+      try {
+        _qrData = await _fetchResidentCode();
+        _startCountdown();
+        setState(() => _authenticated = true);
+      } catch (_) {
+        if (mounted) Navigator.of(context).pop();
       }
     } finally {
       if (mounted) setState(() => _authenticating = false);
+    }
+  }
+
+  Future<String?> _fetchResidentCode() async {
+    // Usar cache local primero — funciona sin internet
+    final cached = SessionStorage.activeProfile?.residentCode;
+    if (cached != null) {
+      // Refrescar en background silenciosamente
+      GaritaDatasource(ref.read(dioClientProvider)).miSolvencia().then((s) {
+        final key = SessionStorage.activeProfile?.storageKey;
+        if (key != null) SessionStorage.saveResidentCode(key, s.residentCode);
+        if (mounted) setState(() => _qrData = s.residentCode);
+      }).catchError((_) {});
+      return cached;
+    }
+    // Sin cache → llamada de red (primer uso)
+    try {
+      final ds = GaritaDatasource(ref.read(dioClientProvider));
+      _solvencia = await ds.miSolvencia();
+      final key = SessionStorage.activeProfile?.storageKey;
+      if (key != null) {
+        SessionStorage.saveResidentCode(key, _solvencia!.residentCode);
+      }
+      return _solvencia!.residentCode;
+    } catch (_) {
+      return null;
     }
   }
 
@@ -93,10 +147,12 @@ class _QrAccessScreenState extends ConsumerState<QrAccessScreen> {
             ? const Center(child: CircularProgressIndicator(color: Colors.white))
             : _authenticated
                 ? _QrView(
-                    host: profile?.host ?? '',
+                    qrData: _qrData ?? '',
+                    logoUrl: profile?.logoUrl,
                     remaining: _remaining,
                     total: _totalSeconds,
                     onRenovar: _renovar,
+                    solvencia: _solvencia,
                   )
                 : _ExpiredView(onRenovar: _renovar),
       ),
@@ -105,16 +161,20 @@ class _QrAccessScreenState extends ConsumerState<QrAccessScreen> {
 }
 
 class _QrView extends StatelessWidget {
-  final String host;
+  final String qrData;
+  final String? logoUrl;
   final int remaining;
   final int total;
   final VoidCallback onRenovar;
+  final Solvencia? solvencia;
 
   const _QrView({
-    required this.host,
+    required this.qrData,
+    this.logoUrl,
     required this.remaining,
     required this.total,
     required this.onRenovar,
+    this.solvencia,
   });
 
   @override
@@ -126,6 +186,7 @@ class _QrView extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
+          // QR
           Container(
             decoration: BoxDecoration(
               color: Colors.white,
@@ -133,22 +194,24 @@ class _QrView extends StatelessWidget {
               boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 24, offset: const Offset(0, 8))],
             ),
             padding: const EdgeInsets.all(20),
-            child: QrImageView(
-              data: host,
-              version: QrVersions.auto,
-              size: 220,
+            child: QrWithLogo(
+              data: qrData,
+              size: 240,
+              logoUrl: logoUrl,
             ),
           ).animate().fadeIn().scale(begin: const Offset(0.8, 0.8)),
           const SizedBox(height: 32),
+
+          // Temporizador
           Stack(
             alignment: Alignment.center,
             children: [
               SizedBox(
-                width: 100,
-                height: 100,
+                width: 80,
+                height: 80,
                 child: CircularProgressIndicator(
                   value: fraction,
-                  strokeWidth: 6,
+                  strokeWidth: 5,
                   backgroundColor: Colors.white24,
                   color: isUrgent ? Colors.red[300] : Colors.white,
                 ),
@@ -159,16 +222,17 @@ class _QrView extends StatelessWidget {
                     '$remaining',
                     style: TextStyle(
                       color: isUrgent ? Colors.red[200] : Colors.white,
-                      fontSize: 32,
+                      fontSize: 26,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  Text('seg', style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 12)),
+                  Text('seg', style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 11)),
                 ],
               ),
             ],
           ).animate(onPlay: (c) => c.repeat()).shimmer(duration: 2000.ms, color: Colors.white24),
-          const SizedBox(height: 32),
+
+          const SizedBox(height: 24),
           if (remaining <= 0)
             FilledButton.icon(
               onPressed: onRenovar,
@@ -176,6 +240,7 @@ class _QrView extends StatelessWidget {
               label: const Text('Renovar pase'),
               style: FilledButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black87),
             ).animate().fadeIn(),
+          const SizedBox(height: 16),
         ],
       ),
     );

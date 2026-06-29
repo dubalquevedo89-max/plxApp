@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:dio/dio.dart';
 import '../../models/usuario_model.dart';
 
@@ -102,6 +103,17 @@ class AuthDatasource {
     await _dio.post(
       '/api/auth/recuperar-password/solicitar',
       data: {'email': email},
+    );
+  }
+
+  Future<void> registerDeviceToken(String token) async {
+    await _dio.post(
+      '/api/auth/device-token',
+      data: {
+        'device_token': token,
+        'platform': Platform.isIOS ? 'ios' : 'android',
+        'confirmed': true,
+      },
     );
   }
 }

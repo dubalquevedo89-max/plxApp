@@ -44,7 +44,11 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.location_city_rounded, size: 72, color: Colors.white)
+            Image.asset(
+              'assets/images/parcelux.png',
+              width: 100,
+              height: 100,
+            )
                 .animate()
                 .fadeIn(duration: 600.ms)
                 .scale(begin: const Offset(0.6, 0.6)),

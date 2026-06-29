@@ -1,13 +1,16 @@
 import 'dart:convert';
 import 'dart:typed_data';
-
-const _salt = 'secure-spatial-obfuscation-key-256-gcm-2026';
+import 'package:flutter/foundation.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 Map<String, dynamic> decryptGeoJson(Map<String, dynamic> response, String slug) {
   final encrypted = response['encrypted'] as bool? ?? false;
   if (!encrypted) return response;
 
-  final keyStr = '$slug-$_salt';
+  final salt = kDebugMode
+      ? (dotenv.env['GEO_DECRYPT_KEY_DEV'] ?? dotenv.env['GEO_DECRYPT_KEY'] ?? '')
+      : (dotenv.env['GEO_DECRYPT_KEY'] ?? '');
+  final keyStr = '$slug-$salt';
   final keyBytes = utf8.encode(keyStr);
   // normalize handles missing padding and whitespace
   final dataBytes = base64.decode(base64.normalize(response['data'] as String));

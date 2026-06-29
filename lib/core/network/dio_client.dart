@@ -9,7 +9,9 @@ part 'dio_client.g.dart';
 
 @riverpod
 Dio dioClient(Ref ref) {
-  final baseUrl = dotenv.env['API_BASE_URL'] ?? 'http://plxmap.com:8000';
+  final baseUrl = kDebugMode
+      ? (dotenv.env['API_BASE_URL_DEV'] ?? dotenv.env['API_BASE_URL'] ?? 'http://localhost:8000')
+      : (dotenv.env['API_BASE_URL'] ?? 'https://plxmap.com');
 
   final dio = Dio(BaseOptions(
     baseUrl: baseUrl,
@@ -78,6 +80,12 @@ class _AuthInterceptor extends Interceptor {
       return;
     }
 
+    // Don't retry if this request was already a retry — prevents infinite loops
+    if (err.requestOptions.extra['retried'] == true) {
+      handler.next(err);
+      return;
+    }
+
     final key = SessionStorage.activeHost;
     if (key == null) {
       handler.next(err);
@@ -129,15 +137,21 @@ class _AuthInterceptor extends Interceptor {
   }
 
   Future<Response> _retry(RequestOptions req) {
+    // Remove stale token so onRequest injects the freshly saved one.
+    // Mark as retried so a subsequent 401 doesn't trigger another refresh cycle.
+    final headers = Map<String, dynamic>.from(req.headers)
+      ..remove('Authorization')
+      ..remove('authorization');
     return _dio.request(
       req.path,
       data: req.data,
       queryParameters: req.queryParameters,
       options: Options(
         method: req.method,
-        headers: req.headers,
+        headers: headers,
         contentType: req.contentType,
         responseType: req.responseType,
+        extra: {...req.extra, 'retried': true},
       ),
     );
   }

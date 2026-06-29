@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -39,9 +40,10 @@ class _AlicuotasScreenState extends ConsumerState<AlicuotasScreen> {
       body: async.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, st) {
-          debugPrint('[Alicuotas] $e\n$st');
+          // 403 = módulo no habilitado para este proyecto
+          final is403 = e is DioException && e.response?.statusCode == 403;
+          if (is403) return const _ModuloNoDisponible();
           return _ErrorView(
-            message: '$e',
             onRetry: () => ref.invalidate(misPagosProvider),
           );
         },
@@ -161,7 +163,7 @@ class _Body extends StatelessWidget {
           ]),
           const SizedBox(height: 12),
 
-          // Chart + distribution
+          // Chart + registros
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -174,12 +176,20 @@ class _Body extends StatelessWidget {
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: _DistributionCard(dist: dist, total: totalFacturado)
-                    .animate()
-                    .fadeIn(delay: 200.ms),
+                child: _RegistrosCard(
+                  total: cobros.length,
+                  pagados: pagados.length,
+                  pendientes: pendientes.length,
+                ).animate().fadeIn(delay: 200.ms),
               ),
             ],
           ),
+          const SizedBox(height: 12),
+
+          // Distribución — ancho completo
+          _DistributionCard(dist: dist, total: totalFacturado)
+              .animate()
+              .fadeIn(delay: 250.ms),
           const SizedBox(height: 20),
 
           // Cobros list
@@ -208,7 +218,10 @@ class _Body extends StatelessWidget {
   Map<String, double> _distribution(List<Cobro> cobros) {
     final map = <String, double>{};
     for (final c in cobros) {
-      map[c.tipoCargo] = (map[c.tipoCargo] ?? 0) + c.monto;
+      final key = c.tipoCargo.endsWith('_saldo')
+          ? c.tipoCargo.substring(0, c.tipoCargo.length - '_saldo'.length)
+          : c.tipoCargo;
+      map[key] = (map[key] ?? 0) + c.monto;
     }
     return map;
   }
@@ -365,6 +378,93 @@ class _DonutCard extends StatelessWidget {
   }
 }
 
+// ── Registros card ────────────────────────────────────────────────────────────
+
+class _RegistrosCard extends StatelessWidget {
+  final int total;
+  final int pagados;
+  final int pendientes;
+
+  const _RegistrosCard({
+    required this.total,
+    required this.pagados,
+    required this.pendientes,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('REGISTROS',
+                style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.grey.shade500,
+                    letterSpacing: 0.5)),
+            const SizedBox(height: 12),
+            Text('$total',
+                style: const TextStyle(
+                    fontSize: 28, fontWeight: FontWeight.bold)),
+            Text('cobros encontrados',
+                style:
+                    TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+            const SizedBox(height: 12),
+            const Divider(height: 1),
+            const SizedBox(height: 10),
+            _RegistroRow(
+              icon: Icons.check_circle_outline,
+              color: Colors.green,
+              label: 'Pagados',
+              count: pagados,
+            ),
+            const SizedBox(height: 6),
+            _RegistroRow(
+              icon: Icons.schedule_outlined,
+              color: Colors.orange,
+              label: 'Pendientes',
+              count: pendientes,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RegistroRow extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String label;
+  final int count;
+
+  const _RegistroRow({
+    required this.icon,
+    required this.color,
+    required this.label,
+    required this.count,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(children: [
+      Icon(icon, size: 14, color: color),
+      const SizedBox(width: 6),
+      Expanded(
+          child: Text(label,
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade600))),
+      Text('$count',
+          style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: color)),
+    ]);
+  }
+}
+
 // ── Distribution card ─────────────────────────────────────────────────────────
 
 class _DistributionCard extends StatelessWidget {
@@ -373,12 +473,36 @@ class _DistributionCard extends StatelessWidget {
 
   const _DistributionCard({required this.dist, required this.total});
 
+  static const _meta = <String, (String, Color)>{
+    'alicuota':       ('Alícuota',                        Colors.blue),
+    'arrendamiento':  ('Arrendamiento',                   Colors.indigo),
+    'multa':          ('Multa',                           Colors.red),
+    'extraordinaria': ('Extraordinaria',                  Colors.purple),
+    'consumo':        ('Consumo',                         Colors.teal),
+    'cuota':          ('Cuota · Venta a Crédito/Contado', Colors.green),
+  };
+
+  static (String, Color) _resolve(String tipo) {
+    if (_meta.containsKey(tipo)) return _meta[tipo]!;
+    if (tipo.endsWith('_saldo')) {
+      final base = tipo.replaceAll('_saldo', '');
+      final baseMeta = _meta[base];
+      if (baseMeta != null) return ('${baseMeta.$1} · Saldo', baseMeta.$2);
+    }
+    return (tipo, Colors.grey);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final items = [
-      ('alicuota', 'Alícuotas', Colors.blue),
-      ('multa', 'Multas', Colors.red),
-      ('extraordinaria', 'Extraordinarias', Colors.purple),
+    // Todos los tipos presentes en los cobros, conocidos primero
+    final knownOrder = _meta.keys.where(dist.containsKey).toList();
+    final unknown = dist.keys.where((k) => !_meta.containsKey(k)).toList();
+    final allKeys = [...knownOrder, ...unknown];
+
+    final palette = [
+      Colors.blue, Colors.red, Colors.purple,
+      Colors.teal, Colors.indigo, Colors.orange,
+      Colors.green, Colors.brown, Colors.pink,
     ];
 
     return Card(
@@ -394,15 +518,16 @@ class _DistributionCard extends StatelessWidget {
                     color: Colors.grey.shade500,
                     letterSpacing: 0.5)),
             const SizedBox(height: 12),
-            ...items.map((item) {
-              final monto = dist[item.$1] ?? 0;
+            ...allKeys.asMap().entries.map((e) {
+              final key = e.value;
+              final resolved = _resolve(key);
+              final label = resolved.$1;
+              final color = resolved.$2 == Colors.grey
+                  ? palette[e.key % palette.length]
+                  : resolved.$2;
+              final monto = dist[key] ?? 0;
               final pct = total > 0 ? monto / total : 0.0;
-              return _DistRow(
-                label: item.$2,
-                monto: monto,
-                pct: pct,
-                color: item.$3,
-              );
+              return _DistRow(label: label, monto: monto, pct: pct, color: color);
             }),
           ],
         ),
@@ -629,12 +754,7 @@ class _TipoBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (label, color) = switch (tipo) {
-      'alicuota' => ('Alícuota ordinaria', Colors.blue),
-      'multa' => ('Multa', Colors.red),
-      'extraordinaria' => ('Cuota extraordinaria', Colors.purple),
-      _ => (tipo, Colors.grey),
-    };
+    final (label, color) = _DistributionCard._resolve(tipo);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
@@ -676,10 +796,42 @@ class _EmptyView extends StatelessWidget {
   }
 }
 
+class _ModuloNoDisponible extends StatelessWidget {
+  const _ModuloNoDisponible();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.lock_outline_rounded,
+                size: 64, color: Colors.grey.shade300),
+            const SizedBox(height: 16),
+            Text('Módulo no habilitado',
+                style: Theme.of(context)
+                    .textTheme
+                    .titleMedium
+                    ?.copyWith(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Text(
+              'El módulo de Alícuotas no está disponible\npara este proyecto.',
+              textAlign: TextAlign.center,
+              style:
+                  TextStyle(color: Colors.grey.shade500, fontSize: 14),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _ErrorView extends StatelessWidget {
-  final String message;
   final VoidCallback onRetry;
-  const _ErrorView({required this.message, required this.onRetry});
+  const _ErrorView({required this.onRetry});
 
   @override
   Widget build(BuildContext context) {
@@ -691,9 +843,9 @@ class _ErrorView extends StatelessWidget {
           children: [
             const Icon(Icons.error_outline, size: 48, color: Colors.red),
             const SizedBox(height: 12),
-            Text(message,
+            const Text('No se pudo cargar la información.',
                 textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 13)),
+                style: TextStyle(fontSize: 13)),
             const SizedBox(height: 16),
             FilledButton(
                 onPressed: onRetry, child: const Text('Reintentar')),

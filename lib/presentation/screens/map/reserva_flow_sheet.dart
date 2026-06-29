@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../core/config/app_router.dart';
 import '../../../domain/entities/tenant_option.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/reserva_flow_provider.dart';
 
 class ReservaFlowSheet extends ConsumerStatefulWidget {
@@ -159,7 +162,9 @@ class _ReservaFlowSheetState extends ConsumerState<ReservaFlowSheet> {
               result: state.result!,
               onClose: () {
                 ref.read(reservaFlowProvider.notifier).reset();
+                ref.invalidate(activeProfileProvider);
                 Navigator.pop(context);
+                context.go(AppRoutes.home);
               },
             )
           else
@@ -292,6 +297,7 @@ class _ProgressView extends StatelessWidget {
     final steps = [
       (ReservaStep.creatingAccount, 'Creando tu cuenta…'),
       (ReservaStep.loggingIn, 'Iniciando sesión…'),
+      (ReservaStep.requestingPermission, 'Activando notificaciones…'),
       (ReservaStep.reserving, 'Reservando lote…'),
     ];
 
@@ -378,7 +384,8 @@ class _SuccessView extends StatelessWidget {
           const SizedBox(height: 8),
           if (venc != null)
             Text(
-              'Tienes hasta el ${_formatDate(venc)} para completar el pago.',
+              'Tu lote está reservado hasta el ${_formatDate(venc)}. '
+              'Si no se llega a un acuerdo en ese plazo, volverá a estar disponible.',
               textAlign: TextAlign.center,
               style:
                   TextStyle(color: Colors.grey.shade600, fontSize: 13),
@@ -403,8 +410,13 @@ class _SuccessView extends StatelessWidget {
     );
   }
 
-  String _formatDate(DateTime dt) =>
-      '${dt.day}/${dt.month}/${dt.year} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+  String _formatDate(DateTime dt) {
+    const meses = [
+      '', 'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+      'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'
+    ];
+    return '${dt.day} de ${meses[dt.month]} de ${dt.year}';
+  }
 }
 
 // ── Login existing ────────────────────────────────────────────────────────────

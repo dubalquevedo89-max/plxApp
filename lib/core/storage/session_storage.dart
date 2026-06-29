@@ -66,6 +66,14 @@ class SessionStorage {
   static Future<void> switchProfile(String key) async =>
       _box.put(_keyActiveHost, {'host': key});
 
+  static Future<void> saveResidentCode(String key, String residentCode) async {
+    final map = _box.get(key);
+    if (map == null) return;
+    final updated = Map<String, dynamic>.from(map)
+      ..['residentCode'] = residentCode;
+    await _box.put(key, updated);
+  }
+
   static Future<void> clearProfile(String key) async {
     await _box.delete(key);
     await _secure.delete(key: 'jwt_$key');

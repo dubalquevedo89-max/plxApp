@@ -94,7 +94,7 @@ final class MisPropiedadesProvider
   }
 }
 
-String _$misPropiedadesHash() => r'c4569ebbc052047211148cd6eb48b877048cfb7a';
+String _$misPropiedadesHash() => r'381d6fbb863df3dba4a28d4a406c26fce033d414';
 
 @ProviderFor(misPagos)
 final misPagosProvider = MisPagosFamily._();
@@ -151,7 +151,7 @@ final class MisPagosProvider
   }
 }
 
-String _$misPagosHash() => r'63150bb5709097637df97c9527aa7cf67cfe40ef';
+String _$misPagosHash() => r'a0561d9c25021d2caeb8c851e529914047f503a2';
 
 final class MisPagosFamily extends $Family
     with

@@ -12,14 +12,10 @@ AlicuotaRepository alicuotaRepository(Ref ref) =>
 
 @riverpod
 Future<MisPropiedades> misPropiedades(Ref ref) {
-  debugPrint('[ALICUOTA] misPropiedadesProvider build');
-  return ref.watch(alicuotaRepositoryProvider).getMisPropiedades();
+  return ref.read(alicuotaRepositoryProvider).getMisPropiedades();
 }
 
 @riverpod
 Future<HistorialPagos> misPagos(Ref ref, {DateTime? desde, DateTime? hasta}) {
-  debugPrint('[ALICUOTA] misPagosProvider build desde=$desde hasta=$hasta');
-  return ref
-      .watch(alicuotaRepositoryProvider)
-      .getMisPagos(desde: desde, hasta: hasta);
+  return ref.read(alicuotaRepositoryProvider).getMisPagos(desde: desde, hasta: hasta);
 }
