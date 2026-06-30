@@ -9,7 +9,13 @@ import '../../providers/tenant_provider.dart';
 
 class UrbanizacionesScreen extends ConsumerStatefulWidget {
   final String pais;
-  const UrbanizacionesScreen({super.key, required this.pais});
+  final bool isSandbox;
+
+  const UrbanizacionesScreen({
+    super.key,
+    required this.pais,
+    this.isSandbox = false,
+  });
 
   @override
   ConsumerState<UrbanizacionesScreen> createState() =>
@@ -27,120 +33,123 @@ class _UrbanizacionesScreenState extends ConsumerState<UrbanizacionesScreen> {
     super.dispose();
   }
 
+  /// Extrae la subdivision de un location_text "Ciudad, Subdivision, País"
+  String _subdivisionFrom(String? locationText) {
+    if (locationText == null) return 'Otros';
+    final parts = locationText.split(', ');
+    return parts.length >= 2 ? parts[1] : parts.first;
+  }
+
+  Widget _searchBar(String hint) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+        child: SearchBar(
+          controller: _searchCtrl,
+          hintText: hint,
+          leading: const Icon(Icons.search_rounded),
+          trailing: [
+            if (_query.isNotEmpty)
+              IconButton(
+                icon: const Icon(Icons.clear),
+                onPressed: () {
+                  _searchCtrl.clear();
+                  setState(() => _query = '');
+                },
+              ),
+          ],
+          onChanged: (v) => setState(() => _query = v.trim().toLowerCase()),
+        ),
+      );
+
+  Widget _emptyState(BuildContext context) => Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.search_off_rounded, size: 48, color: Colors.grey),
+            const SizedBox(height: 12),
+            Text(
+              _query.isEmpty
+                  ? 'No hay proyectos en esta zona'
+                  : 'Sin resultados para "$_query"',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ],
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
-    final subdivAsync = ref.watch(subdivisionesByPaisProvider(widget.pais));
+    // Fuente de datos según modo
+    final allAsync = widget.isSandbox
+        ? ref.watch(sandboxTenantOptionsProvider)
+        : ref.watch(tenantOptionsByPaisProvider(widget.pais));
 
-    return subdivAsync.when(
-      loading: () => const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      ),
-      error: (e, _) => Scaffold(
-        body: Center(child: Text('Error: $e')),
-      ),
-      data: (subdivisions) {
-        // Selecciona la primera por defecto
+    return allAsync.when(
+      loading: () =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
+      error: (e, _) => Scaffold(body: Center(child: Text('Error: $e'))),
+      data: (allOptions) {
+        // Subdivisiones derivadas del location_text en sandbox,
+        // o del campo subdivision del tenant en modo normal
+        final subdivisions = allOptions
+            .map((o) => _subdivisionFrom(o.ubicacionTexto))
+            .toSet()
+            .toList()
+          ..sort();
+
         final active = _selectedSubdivision ??
             (subdivisions.isNotEmpty ? subdivisions.first : null);
 
-        final listAsync = active != null
-            ? ref.watch(tenantOptionsBySubdivisionProvider(widget.pais, active))
-            : ref.watch(tenantOptionsByPaisProvider(widget.pais));
+        // Con búsqueda activa → todos sin filtro de ciudad
+        final items = _query.isNotEmpty
+            ? allOptions
+            : active == null
+                ? allOptions
+                : allOptions
+                    .where((o) => _subdivisionFrom(o.ubicacionTexto) == active)
+                    .toList();
+
+        final filtered = _query.isEmpty
+            ? items
+            : items
+                .where((t) =>
+                    t.nombre.toLowerCase().contains(_query) ||
+                    (t.ubicacionTexto?.toLowerCase().contains(_query) ?? false) ||
+                    (t.parentNombre?.toLowerCase().contains(_query) ?? false))
+                .toList();
 
         return Scaffold(
-          appBar: AppBar(title: Text(widget.pais)),
+          appBar: AppBar(
+            title: Text(widget.isSandbox ? 'Proyectos de prueba' : widget.pais),
+          ),
           body: Column(
             children: [
-              // Chips de provincia
               if (subdivisions.isNotEmpty)
                 _SubdivisionChips(
                   subdivisions: subdivisions,
-                  selected: active,
+                  selected: _query.isNotEmpty ? null : active,
                   onSelected: (sub) => setState(() {
                     _selectedSubdivision = sub;
                     _searchCtrl.clear();
                     _query = '';
                   }),
                 ),
-              // Barra de búsqueda
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-                child: SearchBar(
-                  controller: _searchCtrl,
-                  hintText: 'Buscar urbanización…',
-                  leading: const Icon(Icons.search_rounded),
-                  trailing: [
-                    if (_query.isNotEmpty)
-                      IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          _searchCtrl.clear();
-                          setState(() => _query = '');
-                        },
-                      ),
-                  ],
-                  onChanged: (v) =>
-                      setState(() => _query = v.trim().toLowerCase()),
-                ),
-              ),
-              // Lista
+              _searchBar('Buscar ciudad o proyecto…'),
               Expanded(
-                child: listAsync.when(
-                  loading: () =>
-                      const Center(child: CircularProgressIndicator()),
-                  error: (e, _) => Center(child: Text('Error: $e')),
-                  data: (items) {
-                    final filtered = _query.isEmpty
-                        ? items
-                        : items
-                            .where((t) =>
-                                t.nombre.toLowerCase().contains(_query) ||
-                                (t.ubicacionTexto
-                                        ?.toLowerCase()
-                                        .contains(_query) ??
-                                    false) ||
-                                (t.parentNombre
-                                        ?.toLowerCase()
-                                        .contains(_query) ??
-                                    false))
-                            .toList();
-
-                    if (filtered.isEmpty) {
-                      return Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.search_off_rounded,
-                                size: 48, color: Colors.grey),
-                            const SizedBox(height: 12),
-                            Text(
-                              _query.isEmpty
-                                  ? 'No hay proyectos en esta zona'
-                                  : 'Sin resultados para "$_query"',
-                              style: Theme.of(context).textTheme.bodyMedium,
-                            ),
-                          ],
-                        ),
-                      );
-                    }
-
-                    return ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                      itemCount: filtered.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 12),
-                      itemBuilder: (context, i) => _TenantCard(
-                        option: filtered[i],
-                        onTap: () => context.push(
-                          AppRoutes.login,
-                          extra: filtered[i],
-                        ),
-                      )
-                          .animate()
-                          .fadeIn(delay: (i * 50).ms)
-                          .slideY(begin: 0.08),
-                    );
-                  },
-                ),
+                child: filtered.isEmpty
+                    ? _emptyState(context)
+                    : ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                        itemCount: filtered.length,
+                        separatorBuilder: (_, i) => const SizedBox(height: 12),
+                        itemBuilder: (context, i) => _TenantCard(
+                          option: filtered[i],
+                          onTap: () =>
+                              context.push(AppRoutes.login, extra: filtered[i]),
+                        )
+                            .animate()
+                            .fadeIn(delay: (i * 50).ms)
+                            .slideY(begin: 0.08),
+                      ),
               ),
             ],
           ),
@@ -149,6 +158,8 @@ class _UrbanizacionesScreenState extends ConsumerState<UrbanizacionesScreen> {
     );
   }
 }
+
+// ── Widgets reutilizables ─────────────────────────────────────────────────────
 
 class _SubdivisionChips extends StatelessWidget {
   final List<String> subdivisions;
@@ -169,7 +180,7 @@ class _SubdivisionChips extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         itemCount: subdivisions.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        separatorBuilder: (_, i) => const SizedBox(width: 8),
         itemBuilder: (context, i) {
           final sub = subdivisions[i];
           final isSelected = sub == selected;
@@ -179,8 +190,7 @@ class _SubdivisionChips extends StatelessWidget {
             onSelected: (_) => onSelected(sub),
             showCheckmark: false,
             labelStyle: TextStyle(
-              fontWeight:
-                  isSelected ? FontWeight.bold : FontWeight.normal,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
             ),
           );
         },
@@ -282,7 +292,7 @@ class _Logo extends StatelessWidget {
           width: 52,
           height: 52,
           fit: BoxFit.cover,
-          errorWidget: (_, _, _) => _fallback(primary),
+          errorWidget: (ctx, url, err) => _fallback(primary),
         ),
       );
     }

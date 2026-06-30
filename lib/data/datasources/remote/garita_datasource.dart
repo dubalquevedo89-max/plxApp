@@ -23,6 +23,22 @@ class GaritaDatasource {
     );
   }
 
+  Future<({String projectSlug, List<Map<String, dynamic>> residents})> snapshot({
+    required String apiKey,
+  }) async {
+    final res = await _dio.post(
+      '/api/public/garita/snapshot',
+      data: {'api_key': apiKey},
+    );
+    final d = res.data as Map<String, dynamic>;
+    return (
+      projectSlug: d['project_slug'] as String,
+      residents: (d['residents'] as List)
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList(),
+    );
+  }
+
   Future<AccesoValidacion> verificar({
     String? apiKey,
     required String residentCode,

@@ -4,10 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import '../../../core/config/app_router.dart';
+import '../../../core/network/dio_client.dart';
 import '../../../core/network/tenant_profile.dart';
+import '../../../core/storage/garita_snapshot_storage.dart';
 import '../../../core/storage/session_storage.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../data/datasources/remote/garita_datasource.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/notificacion_provider.dart';
 
@@ -816,12 +820,352 @@ class _GuardiaHome extends ConsumerWidget {
                 ),
               ],
             ),
+
+            const SizedBox(height: 24),
+
+            // Botón sincronizar + estado offline
+            _SyncSection(profile: profile),
           ],
         ),
       ),
     );
   }
 }
+
+// ── Sync Section ─────────────────────────────────────────────────────────────
+
+class _SyncSection extends ConsumerStatefulWidget {
+  final TenantProfile? profile;
+  const _SyncSection({this.profile});
+
+  @override
+  ConsumerState<_SyncSection> createState() => _SyncSectionState();
+}
+
+class _SyncSectionState extends ConsumerState<_SyncSection> {
+  Future<void> _onSincronizar() async {
+    final profile = widget.profile;
+    if (profile?.apiKeyGarita == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('No hay clave de garita configurada para este perfil.')),
+      );
+      return;
+    }
+
+    // Confirmación
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Sincronizar datos'),
+        content: const Text(
+            'Se descargará la lista de residentes para validación offline. ¿Deseas continuar?'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancelar')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Sincronizar')),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => _SyncDialog(
+        profile: profile!,
+        dio: ref.read(dioClientProvider),
+      ),
+    );
+    if (mounted) setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final profileKey = widget.profile?.storageKey ?? '';
+    final hasData = GaritaSnapshotStorage.hasData(profileKey);
+    final lastSync = GaritaSnapshotStorage.lastSync(profileKey);
+    final count = GaritaSnapshotStorage.count(profileKey);
+    final fmt = DateFormat("dd/MM/yyyy 'a las' HH:mm", 'es');
+
+    return Center(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+        // Estado de la última sincronización
+        if (hasData)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.green.shade50,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.green.shade200),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.offline_pin_rounded,
+                    size: 16, color: Colors.green.shade700),
+                const SizedBox(width: 8),
+                Text(
+                  '$count residentes · ${fmt.format(lastSync!.toLocal())}',
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.green.shade800,
+                      fontWeight: FontWeight.w500),
+                ),
+              ],
+            ),
+          )
+        else
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.orange.shade50,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.orange.shade200),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.cloud_off_rounded,
+                    size: 16, color: Colors.orange.shade700),
+                const SizedBox(width: 8),
+                Text(
+                  'Sin datos offline',
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.orange.shade800,
+                      fontWeight: FontWeight.w500),
+                ),
+              ],
+            ),
+          ),
+
+        const SizedBox(height: 12),
+
+        OutlinedButton.icon(
+          onPressed: _onSincronizar,
+          icon: const Icon(Icons.sync_rounded),
+          label: const Text('Sincronizar datos offline'),
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size(220, 44),
+          ),
+        ).animate(delay: 320.ms).fadeIn().slideY(begin: 0.1),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Sync Dialog (stepper) ─────────────────────────────────────────────────────
+
+enum _SyncStep { connecting, downloading, done, error }
+
+class _SyncDialog extends StatefulWidget {
+  final TenantProfile profile;
+  final Dio dio;
+  const _SyncDialog({required this.profile, required this.dio});
+
+  @override
+  State<_SyncDialog> createState() => _SyncDialogState();
+}
+
+class _SyncDialogState extends State<_SyncDialog> {
+  _SyncStep _step = _SyncStep.connecting;
+  String? _errorMsg;
+  int _count = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _run();
+  }
+
+  Future<void> _run() async {
+    try {
+      setState(() => _step = _SyncStep.connecting);
+      final ds = GaritaDatasource(widget.dio);
+
+      setState(() => _step = _SyncStep.downloading);
+      final result = await ds.snapshot(apiKey: widget.profile.apiKeyGarita!);
+
+      await GaritaSnapshotStorage.save(
+        profileKey: widget.profile.storageKey,
+        projectSlug: result.projectSlug,
+        residents: result.residents,
+      );
+
+      if (mounted) {
+        setState(() {
+          _count = result.residents.length;
+          _step = _SyncStep.done;
+        });
+      }
+    } on DioException catch (e) {
+      if (mounted) {
+        setState(() {
+          _step = _SyncStep.error;
+          _errorMsg = _mapError(e);
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _step = _SyncStep.error;
+          _errorMsg = 'Error inesperado. Intenta de nuevo más tarde.';
+        });
+      }
+    }
+  }
+
+  String _mapError(DioException e) {
+    final status = e.response?.statusCode;
+    final detail = (e.response?.data as Map?)?['detail']?.toString();
+    switch (status) {
+      case 400:
+      case 401:
+        if (detail != null && detail.contains('inválida')) {
+          return 'La clave de API no tiene un formato válido. Revísala en los ajustes.';
+        }
+        return 'Credenciales de garita inválidas o expiradas. Solicita una nueva clave al administrador.';
+      case 403:
+        return 'La descarga offline no está disponible en la cuenta de prueba (Sandbox). Opera en modo online.';
+      case 500:
+        return 'Error en el servidor al generar la copia local. Intenta de nuevo más tarde.';
+      default:
+        if (e.type == DioExceptionType.connectionTimeout ||
+            e.type == DioExceptionType.receiveTimeout ||
+            e.type == DioExceptionType.connectionError) {
+          return 'Sin conexión al servidor. Verifica tu red e intenta de nuevo.';
+        }
+        return detail ?? 'Error al sincronizar. Intenta de nuevo.';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDone = _step == _SyncStep.done;
+    final isError = _step == _SyncStep.error;
+
+    final steps = [
+      (
+        _SyncStep.connecting,
+        Icons.wifi_rounded,
+        'Conectando al servidor…',
+      ),
+      (
+        _SyncStep.downloading,
+        Icons.cloud_download_rounded,
+        'Descargando residentes…',
+      ),
+      (
+        _SyncStep.done,
+        Icons.check_circle_rounded,
+        isDone ? '$_count residentes sincronizados' : 'Finalizado',
+      ),
+    ];
+
+    return AlertDialog(
+      title: Row(
+        children: [
+          Icon(
+            isError
+                ? Icons.error_outline_rounded
+                : isDone
+                    ? Icons.check_circle_rounded
+                    : Icons.sync_rounded,
+            color: isError
+                ? Colors.red
+                : isDone
+                    ? Colors.green
+                    : Theme.of(context).colorScheme.primary,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(isError
+                ? 'Error al sincronizar'
+                : isDone
+                    ? 'Sincronización completada'
+                    : 'Sincronizando…'),
+          ),
+        ],
+      ),
+      content: isError
+          ? Text(_errorMsg ?? 'Error desconocido.',
+              style: const TextStyle(fontSize: 14))
+          : Column(
+              mainAxisSize: MainAxisSize.min,
+              children: steps.map((s) {
+                final idx = steps.indexOf(s);
+                final currentIdx = steps.indexWhere((e) => e.$1 == _step);
+                final isDoneStep = idx < currentIdx ||
+                    (_step == _SyncStep.done);
+                final isCurrent = s.$1 == _step && !isDone;
+
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 28,
+                        height: 28,
+                        child: isCurrent
+                            ? const CircularProgressIndicator(strokeWidth: 2.5)
+                                .animate()
+                                .fadeIn()
+                            : Icon(
+                                isDoneStep
+                                    ? Icons.check_circle_rounded
+                                    : Icons.radio_button_unchecked,
+                                color: isDoneStep
+                                    ? Colors.green
+                                    : Colors.grey.shade400,
+                                size: 26,
+                              ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Text(
+                          s.$3,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: isCurrent || (isDone && idx == 2)
+                                ? FontWeight.w600
+                                : FontWeight.normal,
+                            color: isCurrent
+                                ? Theme.of(context).colorScheme.primary
+                                : isDoneStep
+                                    ? Colors.black87
+                                    : Colors.grey.shade400,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ).animate(delay: (idx * 100).ms).fadeIn().slideX(begin: -0.1),
+                );
+              }).toList(),
+            ),
+      actions: [
+        if (isDone)
+          FilledButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Aceptar'),
+          )
+        else if (isError)
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cerrar'),
+          ),
+      ],
+    );
+  }
+}
+
+// ── Guardia Module ────────────────────────────────────────────────────────────
 
 class _GuardiaModule extends StatelessWidget {
   final IconData icon;

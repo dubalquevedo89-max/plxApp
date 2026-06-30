@@ -1,9 +1,9 @@
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../../core/network/dio_client.dart';
+import '../../../core/services/garita_verify_service.dart';
 import '../../../core/storage/session_storage.dart';
 import '../../../data/datasources/remote/garita_datasource.dart';
 
@@ -38,43 +38,23 @@ class _ValidarQrScreenState extends ConsumerState<ValidarQrScreen> {
     await _controller.stop();
 
     final profile = SessionStorage.activeProfile;
-    final apiKey = profile?.apiKeyGarita;
+    final service = GaritaVerifyService(GaritaDatasource(ref.read(dioClientProvider)));
 
-    try {
-      final ds = GaritaDatasource(ref.read(dioClientProvider));
-      final res = await ds.verificar(apiKey: apiKey, residentCode: code);
-      if (mounted) {
-        setState(() {
-          _loading = false;
-          _result = _ResultData(
-            allowed: res.allowedAccess,
-            status: res.status,
-            message: res.message,
-            code: res.residentCode,
-          );
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        String errorMsg = 'Error al verificar. Inténtalo de nuevo.';
-        if (e is DioException) {
-          final data = e.response?.data;
-          if (data is Map) {
-            errorMsg = data['detail']?.toString() ?? errorMsg;
-          } else if (data is String && data.isNotEmpty) {
-            errorMsg = data;
-          }
-        }
-        setState(() {
-          _loading = false;
-          _result = _ResultData(
-            allowed: false,
-            status: 'ERROR',
-            message: errorMsg,
-            code: code,
-          );
-        });
-      }
+    final res = await service.verificar(
+      profileKey: profile?.storageKey ?? '',
+      apiKey: profile?.apiKeyGarita,
+      residentCode: code,
+    );
+    if (mounted) {
+      setState(() {
+        _loading = false;
+        _result = _ResultData(
+          allowed: res.allowedAccess,
+          status: res.status,
+          message: res.message,
+          code: res.residentCode,
+        );
+      });
     }
   }
 

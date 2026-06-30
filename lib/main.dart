@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'core/config/app_router.dart';
 import 'core/services/push_notification_service.dart';
+import 'core/storage/garita_snapshot_storage.dart';
 import 'core/storage/session_storage.dart';
 import 'core/theme/app_theme.dart';
 import 'firebase_options.dart';
@@ -21,6 +22,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: '.env');
   await SessionStorage.init();
+  await GaritaSnapshotStorage.init();
   await initializeDateFormatting('es', null);
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);

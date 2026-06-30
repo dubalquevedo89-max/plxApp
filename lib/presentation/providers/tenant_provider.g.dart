@@ -8,6 +8,63 @@ part of 'tenant_provider.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
+/// Flag: el usuario abrió el navegador para registrar un proyecto.
+
+@ProviderFor(RegistroOpened)
+final registroOpenedProvider = RegistroOpenedProvider._();
+
+/// Flag: el usuario abrió el navegador para registrar un proyecto.
+final class RegistroOpenedProvider
+    extends $NotifierProvider<RegistroOpened, bool> {
+  /// Flag: el usuario abrió el navegador para registrar un proyecto.
+  RegistroOpenedProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'registroOpenedProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$registroOpenedHash();
+
+  @$internal
+  @override
+  RegistroOpened create() => RegistroOpened();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(bool value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<bool>(value),
+    );
+  }
+}
+
+String _$registroOpenedHash() => r'df4bc185502c2408219ed227014cd7e0e40ac9b7';
+
+/// Flag: el usuario abrió el navegador para registrar un proyecto.
+
+abstract class _$RegistroOpened extends $Notifier<bool> {
+  bool build();
+  @$mustCallSuper
+  @override
+  WhenComplete runBuild() {
+    final ref = this.ref as $Ref<bool, bool>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<bool, bool>,
+              bool,
+              Object?,
+              Object?
+            >;
+    return element.handleCreate(ref, build);
+  }
+}
 
 @ProviderFor(projectRepository)
 final projectRepositoryProvider = ProjectRepositoryProvider._();
@@ -97,8 +154,12 @@ final class ProjectsByPaisProvider
 
 String _$projectsByPaisHash() => r'1f23531d388c8afd9fc91e6fca1343c67c87187f';
 
+/// Urbanizaciones de un país, sin el tenant sandbox.
+
 @ProviderFor(urbanizacionesByPais)
 final urbanizacionesByPaisProvider = UrbanizacionesByPaisFamily._();
+
+/// Urbanizaciones de un país, sin el tenant sandbox.
 
 final class UrbanizacionesByPaisProvider
     extends
@@ -110,6 +171,7 @@ final class UrbanizacionesByPaisProvider
     with
         $FutureModifier<List<Urbanizacion>>,
         $FutureProvider<List<Urbanizacion>> {
+  /// Urbanizaciones de un país, sin el tenant sandbox.
   UrbanizacionesByPaisProvider._({
     required UrbanizacionesByPaisFamily super.from,
     required String super.argument,
@@ -155,7 +217,9 @@ final class UrbanizacionesByPaisProvider
 }
 
 String _$urbanizacionesByPaisHash() =>
-    r'de550ca06b452da46ca2944e9c50e9b8870a5ca0';
+    r'c83b2e5c5bc960c91701df6c618961333869a83f';
+
+/// Urbanizaciones de un país, sin el tenant sandbox.
 
 final class UrbanizacionesByPaisFamily extends $Family
     with $FunctionalFamilyOverride<FutureOr<List<Urbanizacion>>, String> {
@@ -167,6 +231,8 @@ final class UrbanizacionesByPaisFamily extends $Family
         $allTransitiveDependencies: null,
         isAutoDispose: true,
       );
+
+  /// Urbanizaciones de un país, sin el tenant sandbox.
 
   UrbanizacionesByPaisProvider call(String pais) =>
       UrbanizacionesByPaisProvider._(argument: pais, from: this);
@@ -338,92 +404,6 @@ final class UrbanizacionesBySubdivisionFamily extends $Family
   String toString() => r'urbanizacionesBySubdivisionProvider';
 }
 
-@ProviderFor(tenantOptionsBySubdivision)
-final tenantOptionsBySubdivisionProvider = TenantOptionsBySubdivisionFamily._();
-
-final class TenantOptionsBySubdivisionProvider
-    extends
-        $FunctionalProvider<
-          AsyncValue<List<TenantOption>>,
-          List<TenantOption>,
-          FutureOr<List<TenantOption>>
-        >
-    with
-        $FutureModifier<List<TenantOption>>,
-        $FutureProvider<List<TenantOption>> {
-  TenantOptionsBySubdivisionProvider._({
-    required TenantOptionsBySubdivisionFamily super.from,
-    required (String, String) super.argument,
-  }) : super(
-         retry: null,
-         name: r'tenantOptionsBySubdivisionProvider',
-         isAutoDispose: true,
-         dependencies: null,
-         $allTransitiveDependencies: null,
-       );
-
-  @override
-  String debugGetCreateSourceHash() => _$tenantOptionsBySubdivisionHash();
-
-  @override
-  String toString() {
-    return r'tenantOptionsBySubdivisionProvider'
-        ''
-        '$argument';
-  }
-
-  @$internal
-  @override
-  $FutureProviderElement<List<TenantOption>> $createElement(
-    $ProviderPointer pointer,
-  ) => $FutureProviderElement(pointer);
-
-  @override
-  FutureOr<List<TenantOption>> create(Ref ref) {
-    final argument = this.argument as (String, String);
-    return tenantOptionsBySubdivision(ref, argument.$1, argument.$2);
-  }
-
-  @override
-  bool operator ==(Object other) {
-    return other is TenantOptionsBySubdivisionProvider &&
-        other.argument == argument;
-  }
-
-  @override
-  int get hashCode {
-    return argument.hashCode;
-  }
-}
-
-String _$tenantOptionsBySubdivisionHash() =>
-    r'7651f5c96e77d311b8f8590a7738e0dd41aaed09';
-
-final class TenantOptionsBySubdivisionFamily extends $Family
-    with
-        $FunctionalFamilyOverride<
-          FutureOr<List<TenantOption>>,
-          (String, String)
-        > {
-  TenantOptionsBySubdivisionFamily._()
-    : super(
-        retry: null,
-        name: r'tenantOptionsBySubdivisionProvider',
-        dependencies: null,
-        $allTransitiveDependencies: null,
-        isAutoDispose: true,
-      );
-
-  TenantOptionsBySubdivisionProvider call(String pais, String subdivision) =>
-      TenantOptionsBySubdivisionProvider._(
-        argument: (pais, subdivision),
-        from: this,
-      );
-
-  @override
-  String toString() => r'tenantOptionsBySubdivisionProvider';
-}
-
 @ProviderFor(tenantOptionsByPais)
 final tenantOptionsByPaisProvider = TenantOptionsByPaisFamily._();
 
@@ -482,7 +462,7 @@ final class TenantOptionsByPaisProvider
 }
 
 String _$tenantOptionsByPaisHash() =>
-    r'f1625c557125aeadd18c8b990cd7bcce714eb895';
+    r'dee193387774f3bb72af6ab44ef9601e0a59034f';
 
 final class TenantOptionsByPaisFamily extends $Family
     with $FunctionalFamilyOverride<FutureOr<List<TenantOption>>, String> {
@@ -501,3 +481,50 @@ final class TenantOptionsByPaisFamily extends $Family
   @override
   String toString() => r'tenantOptionsByPaisProvider';
 }
+
+/// VPs del tenant sandbox como TenantOption independientes (con su propia ubicación).
+
+@ProviderFor(sandboxTenantOptions)
+final sandboxTenantOptionsProvider = SandboxTenantOptionsProvider._();
+
+/// VPs del tenant sandbox como TenantOption independientes (con su propia ubicación).
+
+final class SandboxTenantOptionsProvider
+    extends
+        $FunctionalProvider<
+          AsyncValue<List<TenantOption>>,
+          List<TenantOption>,
+          FutureOr<List<TenantOption>>
+        >
+    with
+        $FutureModifier<List<TenantOption>>,
+        $FutureProvider<List<TenantOption>> {
+  /// VPs del tenant sandbox como TenantOption independientes (con su propia ubicación).
+  SandboxTenantOptionsProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'sandboxTenantOptionsProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$sandboxTenantOptionsHash();
+
+  @$internal
+  @override
+  $FutureProviderElement<List<TenantOption>> $createElement(
+    $ProviderPointer pointer,
+  ) => $FutureProviderElement(pointer);
+
+  @override
+  FutureOr<List<TenantOption>> create(Ref ref) {
+    return sandboxTenantOptions(ref);
+  }
+}
+
+String _$sandboxTenantOptionsHash() =>
+    r'5e5c1681d2ddddfbf3b07b35ae73ef58d72cfbc8';

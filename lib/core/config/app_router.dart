@@ -46,6 +46,7 @@ abstract class AppRoutes {
   static const alertas = '/alertas';
   static const alertasHistorial = '/alertas-historial';
   static const misAlertas = '/mis-alertas';
+  static const sandboxProjects = '/sandbox-projects';
 }
 
 @riverpod
@@ -144,6 +145,13 @@ GoRouter appRouter(Ref ref) {
       GoRoute(
         path: AppRoutes.misAlertas,
         builder: (_, _) => const MisAlertasScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.sandboxProjects,
+        builder: (_, _) => const UrbanizacionesScreen(
+          pais: 'Pruebas',
+          isSandbox: true,
+        ),
       ),
     ],
   );

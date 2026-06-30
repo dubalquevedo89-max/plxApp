@@ -64,6 +64,10 @@ class _AuthInterceptor extends Interceptor {
           options.headers['Host'] = key;
         }
       }
+
+      // Stamp which profile key was used so the error handler refreshes
+      // the correct profile even if activeHost changes between request and 401.
+      options.extra.putIfAbsent('profileKey', () => key);
     }
 
     final sandbox = dotenv.env['SANDBOX_SLUG'] ?? '';
@@ -86,7 +90,11 @@ class _AuthInterceptor extends Interceptor {
       return;
     }
 
-    final key = SessionStorage.activeHost;
+    // Use the profile key stamped at request time, not the current activeHost.
+    // This prevents using the wrong profile's refresh token when multiple
+    // profiles are active and activeHost has changed since the request was made.
+    final key = err.requestOptions.extra['profileKey'] as String?
+        ?? SessionStorage.activeHost;
     if (key == null) {
       handler.next(err);
       return;
@@ -96,7 +104,7 @@ class _AuthInterceptor extends Interceptor {
     if (_refreshCompleter != null) {
       try {
         await _refreshCompleter!.future;
-        final retried = await _retry(err.requestOptions);
+        final retried = await _retry(err.requestOptions, key);
         handler.resolve(retried);
       } catch (_) {
         handler.next(err);
@@ -126,7 +134,7 @@ class _AuthInterceptor extends Interceptor {
       _refreshCompleter!.complete();
       _refreshCompleter = null;
 
-      final retried = await _retry(err.requestOptions);
+      final retried = await _retry(err.requestOptions, key);
       handler.resolve(retried);
     } catch (e) {
       _refreshCompleter?.completeError(e);
@@ -136,12 +144,16 @@ class _AuthInterceptor extends Interceptor {
     }
   }
 
-  Future<Response> _retry(RequestOptions req) {
-    // Remove stale token so onRequest injects the freshly saved one.
-    // Mark as retried so a subsequent 401 doesn't trigger another refresh cycle.
+  Future<Response> _retry(RequestOptions req, String profileKey) async {
+    // Inject the fresh token for the correct profile directly — don't rely on
+    // onRequest re-reading activeHost, which may point to a different profile.
+    final freshJwt = await SessionStorage.getJwt(profileKey);
     final headers = Map<String, dynamic>.from(req.headers)
       ..remove('Authorization')
       ..remove('authorization');
+    if (freshJwt != null) {
+      headers['Authorization'] = 'Bearer $freshJwt';
+    }
     return _dio.request(
       req.path,
       data: req.data,
