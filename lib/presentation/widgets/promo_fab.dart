@@ -12,36 +12,70 @@ String get _registroUrl {
       : (dotenv.env['REGISTER_URL'] ?? 'https://plxmap.com/registro');
 }
 
+Future<void> showPromoDialog(BuildContext context, WidgetRef ref) =>
+    showDialog(context: context, builder: (_) => _PromoDialog(ref: ref));
+
 class PromoFab extends ConsumerWidget {
   const PromoFab({super.key});
 
-  Future<void> _showPromoDialog(BuildContext context, WidgetRef ref) async {
-    await showDialog(
-      context: context,
-      builder: (ctx) => _PromoDialog(ref: ref),
-    );
-  }
+  Future<void> _showPromoDialog(BuildContext context, WidgetRef ref) =>
+      showPromoDialog(context, ref);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final primary = Theme.of(context).colorScheme.primary;
-    return FloatingActionButton.extended(
-      onPressed: () => _showPromoDialog(context, ref),
-      backgroundColor: primary,
-      elevation: 4,
-      icon: const Icon(Icons.rocket_launch_rounded, color: Colors.white),
-      label: const Text(
-        '¡Crea tu proyecto!',
-        style: TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.bold,
-          fontSize: 13,
+    return Card(
+      elevation: 0,
+      color: primary.withValues(alpha: 0.08),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () => _showPromoDialog(context, ref),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: primary.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.rocket_launch_rounded, color: primary, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '¿Administras una urbanización?',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: primary,
+                      ),
+                    ),
+                    Text(
+                      'Crea tu proyecto gratis →',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: primary.withValues(alpha: 0.75),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     )
-        .animate(delay: 600.ms)
-        .fadeIn(duration: 500.ms)
-        .slideY(begin: 0.4, duration: 500.ms, curve: Curves.easeOutBack);
+        .animate(delay: 300.ms)
+        .fadeIn(duration: 400.ms)
+        .slideY(begin: -0.1, duration: 400.ms, curve: Curves.easeOut);
   }
 }
 

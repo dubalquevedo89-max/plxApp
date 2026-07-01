@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/config/app_router.dart';
 import '../../../domain/entities/tenant_option.dart';
 import '../../providers/tenant_provider.dart';
+import '../../widgets/promo_fab.dart';
 
 class UrbanizacionesScreen extends ConsumerStatefulWidget {
   final String pais;
@@ -72,6 +73,15 @@ class _UrbanizacionesScreenState extends ConsumerState<UrbanizacionesScreen> {
                   : 'Sin resultados para "$_query"',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
+            if (_query.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(
+                'Crea gratis un proyecto en Parcelux',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Colors.grey,
+                    ),
+              ),
+            ],
           ],
         ),
       );
@@ -120,6 +130,12 @@ class _UrbanizacionesScreenState extends ConsumerState<UrbanizacionesScreen> {
         return Scaffold(
           appBar: AppBar(
             title: Text(widget.isSandbox ? 'Proyectos de prueba' : widget.pais),
+          ),
+          bottomNavigationBar: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              child: const PromoFab(),
+            ),
           ),
           body: Column(
             children: [

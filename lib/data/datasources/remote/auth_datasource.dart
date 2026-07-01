@@ -99,10 +99,14 @@ class AuthDatasource {
     );
   }
 
-  Future<void> solicitarRecuperacion(String email) async {
+  Future<void> solicitarRecuperacion(String email, String host, {String? virtualProjectSlug}) async {
     await _dio.post(
       '/api/auth/recuperar-password/solicitar',
       data: {'email': email},
+      options: Options(headers: {
+        'Host': host,
+        'x-virtual-project-slug': virtualProjectSlug,
+      }),
     );
   }
 

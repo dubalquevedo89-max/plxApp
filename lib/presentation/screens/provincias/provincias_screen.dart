@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/config/app_router.dart';
 import '../../providers/tenant_provider.dart';
-import '../../widgets/promo_fab.dart';
 
 class ProvinciasScreen extends ConsumerWidget {
   final String pais;
@@ -16,7 +15,6 @@ class ProvinciasScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(title: Text(pais)),
-      floatingActionButton: const PromoFab(),
       body: subdivAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Error: $e')),

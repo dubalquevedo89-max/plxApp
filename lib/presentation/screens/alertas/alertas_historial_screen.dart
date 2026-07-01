@@ -157,19 +157,29 @@ class _AlertasHistorialScreenState
           ? const Center(child: CircularProgressIndicator())
           : _error != null
               ? Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.error_outline,
-                          size: 48, color: Colors.red),
-                      const SizedBox(height: 12),
-                      const Text('No se pudo cargar el historial'),
-                      const SizedBox(height: 12),
-                      FilledButton(
-                        onPressed: () => _load(reset: true),
-                        child: const Text('Reintentar'),
-                      ),
-                    ],
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.error_outline,
+                            size: 48, color: Colors.red),
+                        const SizedBox(height: 12),
+                        const Text('No se pudo cargar el historial'),
+                        const SizedBox(height: 8),
+                        Text(
+                          _error!,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                              fontSize: 11, color: Colors.grey),
+                        ),
+                        const SizedBox(height: 12),
+                        FilledButton(
+                          onPressed: () => _load(reset: true),
+                          child: const Text('Reintentar'),
+                        ),
+                      ],
+                    ),
                   ),
                 )
               : _items.isEmpty

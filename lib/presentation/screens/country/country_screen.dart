@@ -9,12 +9,27 @@ import '../../../domain/entities/urbanizacion.dart';
 import '../../providers/tenant_provider.dart';
 import '../../widgets/promo_fab.dart';
 
-const _flags = {
-  'Ecuador': '🇪🇨',
-  'Colombia': '🇨🇴',
-  'Perú': '🇵🇪',
-  'Panamá': '🇵🇦',
+/// Convierte un código ISO 3166-1 alpha-2 a emoji de bandera.
+String _isoToFlag(String iso) {
+  final base = 0x1F1E6 - 0x41;
+  return String.fromCharCodes(iso.toUpperCase().codeUnits.map((c) => base + c));
+}
+
+/// Mapa nombre de país (como viene del backend) → ISO 3166-1 alpha-2.
+const _countryIso = {
+  'Argentina': 'AR', 'Bolivia': 'BO', 'Brasil': 'BR', 'Chile': 'CL',
+  'Colombia': 'CO', 'Costa Rica': 'CR', 'Cuba': 'CU', 'Ecuador': 'EC',
+  'El Salvador': 'SV', 'Guatemala': 'GT', 'Honduras': 'HN', 'México': 'MX',
+  'Mexico': 'MX', 'Nicaragua': 'NI', 'Panamá': 'PA', 'Panama': 'PA',
+  'Paraguay': 'PY', 'Perú': 'PE', 'Peru': 'PE', 'República Dominicana': 'DO',
+  'Uruguay': 'UY', 'Venezuela': 'VE', 'España': 'ES', 'Spain': 'ES',
+  'Estados Unidos': 'US', 'United States': 'US',
 };
+
+String _flagFor(String pais) {
+  final iso = _countryIso[pais];
+  return iso != null ? _isoToFlag(iso) : '🏳️';
+}
 
 class CountryScreen extends ConsumerStatefulWidget {
   const CountryScreen({super.key});
@@ -55,6 +70,9 @@ class _CountryScreenState extends ConsumerState<CountryScreen>
     context.push(AppRoutes.sandboxProjects);
   }
 
+  void _showPromo(BuildContext context) =>
+      showPromoDialog(context, ref);
+
   Future<void> _showSheet() async {
     if (!mounted) return;
 
@@ -93,6 +111,10 @@ class _CountryScreenState extends ConsumerState<CountryScreen>
           Navigator.pop(context);
           context.push(AppRoutes.login, extra: option);
         },
+        onNotFound: () {
+          Navigator.pop(context);
+          context.push(AppRoutes.sandboxProjects);
+        },
       ),
     );
   }
@@ -113,86 +135,98 @@ class _CountryScreenState extends ConsumerState<CountryScreen>
     final sandboxSlug = dotenv.env['SANDBOX_SLUG'] ?? '';
 
     return Scaffold(
-      floatingActionButton: const PromoFab(),
-      bottomNavigationBar: sandboxSlug.isNotEmpty
-          ? SafeArea(
+      body: Column(
+        children: [
+          Expanded(
+            child: SafeArea(
+              bottom: false,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                child: _SandboxTile(onTap: _goToSandbox),
-              ),
-            )
-          : null,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 48),
-              Text(
-                'Bienvenido',
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-              ).animate().fadeIn().slideY(begin: -0.2),
-              const SizedBox(height: 8),
-              Text(
-                '¿En qué país se encuentra tu urbanización?',
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-              ).animate().fadeIn(delay: 100.ms),
-              const SizedBox(height: 16),
-              SearchBar(
-                controller: _searchCtrl,
-                hintText: 'Buscar país…',
-                leading: const Icon(Icons.search_rounded),
-                trailing: [
-                  if (_query.isNotEmpty)
-                    IconButton(
-                      icon: const Icon(Icons.clear),
-                      onPressed: () {
-                        _searchCtrl.clear();
-                        setState(() => _query = '');
-                      },
-                    ),
-                ],
-                onChanged: (v) => setState(() => _query = v.trim().toLowerCase()),
-              ),
-              const SizedBox(height: 16),
-              Expanded(
-                child: projectsAsync.when(
-                  loading: () => const Center(child: CircularProgressIndicator()),
-                  error: (e, _) => _ErrorView(
-                      onRetry: () => ref.invalidate(projectsByPaisProvider)),
-                  data: (byPais) {
-                    final paises = byPais.keys
-                        .where((p) => byPais[p]!.any((u) => u.slug != sandboxSlug))
-                        .where((p) => _query.isEmpty || p.toLowerCase().contains(_query))
-                        .toList()
-                      ..sort();
-
-                    return ListView.separated(
-                      itemCount: paises.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 12),
-                      itemBuilder: (context, i) {
-                        final pais = paises[i];
-                        return _CountryTile(
-                          flag: _flags[pais] ?? '🏳️',
-                          pais: pais,
-                          onTap: () => context.push(
-                            AppRoutes.urbanizaciones,
-                            extra: pais,
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const SizedBox(height: 24),
+                    Text(
+                      '¡Hola! 👋',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
                           ),
-                        ).animate().fadeIn(delay: (i * 80).ms).slideX(begin: -0.1);
-                      },
-                    );
-                  },
+                    ).animate().fadeIn().slideY(begin: -0.2),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Selecciona tu país para continuar',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                    ).animate().fadeIn(delay: 100.ms),
+                    const SizedBox(height: 12),
+                    SearchBar(
+                      controller: _searchCtrl,
+                      hintText: 'Buscar país…',
+                      leading: const Icon(Icons.search_rounded),
+                      trailing: [
+                        if (_query.isNotEmpty)
+                          IconButton(
+                            icon: const Icon(Icons.clear),
+                            onPressed: () {
+                              _searchCtrl.clear();
+                              setState(() => _query = '');
+                            },
+                          ),
+                      ],
+                      onChanged: (v) => setState(() => _query = v.trim().toLowerCase()),
+                    ),
+                    const SizedBox(height: 16),
+                    Expanded(
+                      child: projectsAsync.when(
+                        loading: () => const Center(child: CircularProgressIndicator()),
+                        error: (e, _) => _ErrorView(
+                            onRetry: () => ref.invalidate(projectsByPaisProvider)),
+                        data: (byPais) {
+                          final paises = byPais.keys
+                              .where((p) => byPais[p]!.any((u) => u.slug != sandboxSlug))
+                              .where((p) => _query.isEmpty || p.toLowerCase().contains(_query))
+                              .toList()
+                            ..sort();
+
+                          if (paises.isEmpty && _query.isNotEmpty) {
+                            return _CountryNotFound(query: _query);
+                          }
+
+                          return ListView.separated(
+                            itemCount: paises.length,
+                            padding: const EdgeInsets.only(bottom: 8),
+                            separatorBuilder: (_, _) => const SizedBox(height: 12),
+                            itemBuilder: (context, i) {
+                              final pais = paises[i];
+                              return _CountryTile(
+                                flag: _flagFor(pais),
+                                pais: pais,
+                                onTap: () => context.push(
+                                  AppRoutes.urbanizaciones,
+                                  extra: pais,
+                                ),
+                              ).animate().fadeIn(delay: (i * 80).ms).slideX(begin: -0.1);
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
+            ),
           ),
-        ),
+          SafeArea(
+            top: false,
+            child: _BottomFabBar(
+              onRegistro: () => _showPromo(context),
+              onSandbox: sandboxSlug.isNotEmpty ? _goToSandbox : null,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -203,14 +237,19 @@ class _CountryScreenState extends ConsumerState<CountryScreen>
 class _NuevoProyectoSheet extends StatelessWidget {
   final Urbanizacion? tenant;
   final void Function(TenantOption) onSelect;
+  final VoidCallback onNotFound;
 
-  const _NuevoProyectoSheet({required this.tenant, required this.onSelect});
+  const _NuevoProyectoSheet({
+    required this.tenant,
+    required this.onSelect,
+    required this.onNotFound,
+  });
 
   @override
   Widget build(BuildContext context) {
     final primary = Theme.of(context).colorScheme.primary;
     // Últimos 5 VPs (ya vienen ordenados por created desc desde el backend)
-    final vps = tenant?.virtualProjects.take(5).toList() ?? [];
+    final vps = tenant?.virtualProjects.take(1).toList() ?? [];
 
     return Padding(
       padding: EdgeInsets.only(
@@ -318,8 +357,8 @@ class _NuevoProyectoSheet extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('No es ninguno de estos'),
+              onPressed: onNotFound,
+              child: const Text('No es mi proyecto, ir a buscar'),
             ),
           ),
           const SizedBox(height: 16),
@@ -359,37 +398,86 @@ class _CountryTile extends StatelessWidget {
   }
 }
 
-class _SandboxTile extends StatelessWidget {
-  final VoidCallback onTap;
-  const _SandboxTile({required this.onTap});
+// ── Bottom FAB bar ────────────────────────────────────────────────────────────
+
+class _BottomFabBar extends StatefulWidget {
+  final VoidCallback onRegistro;
+  final VoidCallback? onSandbox;
+  const _BottomFabBar({required this.onRegistro, this.onSandbox});
+
+  @override
+  State<_BottomFabBar> createState() => _BottomFabBarState();
+}
+
+class _BottomFabBarState extends State<_BottomFabBar> {
+  final _leftKey = GlobalKey<_SwipeFabState>();
+  final _rightKey = GlobalKey<_SwipeFabState>();
 
   @override
   Widget build(BuildContext context) {
-    final primary = Theme.of(context).colorScheme.primary;
-    return Card(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: primary.withValues(alpha: 0.4), width: 1.5),
-      ),
-      child: ListTile(
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-        leading: Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: primary.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(10),
+    return SizedBox(
+      height: 80,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned(
+            left: 20,
+            top: 12,
+            child: _SwipeFab(
+              key: _leftKey,
+              icon: Icons.rocket_launch_rounded,
+              label: 'Crea tu proyecto gratis',
+              expandsRight: true,
+              onActivate: widget.onRegistro,
+              onExpand: () => _rightKey.currentState?.collapse(),
+            ),
           ),
-          child: Icon(Icons.science_rounded, color: primary),
-        ),
-        title: Text(
-          '¡Tengo un proyecto de pruebas!',
-          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: primary),
-        ),
-        subtitle: const Text('Accede a tu proyecto sandbox', style: TextStyle(fontSize: 12)),
-        trailing: Icon(Icons.arrow_forward_ios_rounded, size: 16, color: primary),
-        onTap: onTap,
+          if (widget.onSandbox != null)
+            Positioned(
+              right: 20,
+              top: 12,
+              child: _SwipeFab(
+                key: _rightKey,
+                icon: Icons.layers_rounded,
+                label: 'Explorar proyectos de prueba',
+                expandsRight: false,
+                expandWidth: 240.0,
+                onActivate: widget.onSandbox!,
+                onExpand: () => _leftKey.currentState?.collapse(),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CountryNotFound extends StatelessWidget {
+  final String query;
+  const _CountryNotFound({required this.query});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.search_off_rounded, size: 48, color: Colors.grey),
+          const SizedBox(height: 12),
+          Text(
+            'Sin resultados para "$query"',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Intenta con los proyectos de prueba',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Colors.grey,
+                ),
+          ),
+        ],
       ),
     );
   }
@@ -412,6 +500,192 @@ class _ErrorView extends StatelessWidget {
           FilledButton(
               onPressed: onRetry, child: const Text('Reintentar')),
         ],
+      ),
+    );
+  }
+}
+
+// ── Swipe FAB ────────────────────────────────────────────────────────────────
+
+class _SwipeFab extends StatefulWidget {
+  final IconData icon;
+  final String label;
+  final bool expandsRight;
+  final VoidCallback onActivate;
+  final VoidCallback? onExpand;
+  final double expandWidth;
+
+  const _SwipeFab({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.expandsRight,
+    required this.onActivate,
+    this.onExpand,
+    this.expandWidth = 190.0,
+  });
+
+  @override
+  State<_SwipeFab> createState() => _SwipeFabState();
+}
+
+class _SwipeFabState extends State<_SwipeFab>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  static const _iconSize = 56.0;
+  bool _notifiedExpand = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 280),
+    );
+    _ctrl.addListener(() {
+      if (_ctrl.value > 0.15 && !_notifiedExpand) {
+        _notifiedExpand = true;
+        widget.onExpand?.call();
+      } else if (_ctrl.value <= 0.15) {
+        _notifiedExpand = false;
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  void collapse() {
+    _ctrl.animateTo(0.0, curve: Curves.easeIn);
+  }
+
+  void _onDragUpdate(DragUpdateDetails d) {
+    final delta = widget.expandsRight ? d.delta.dx : -d.delta.dx;
+    _ctrl.value = (_ctrl.value + delta / widget.expandWidth).clamp(0.0, 1.0);
+  }
+
+  void _onDragEnd(DragEndDetails d) {
+    if (_ctrl.value >= 0.5) {
+      _ctrl.animateTo(1.0, curve: Curves.easeOut).then((_) {
+        widget.onActivate();
+        _ctrl.animateTo(0.0, curve: Curves.easeIn);
+      });
+    } else {
+      _ctrl.animateTo(0.0, curve: Curves.easeIn);
+    }
+  }
+
+  void _onTap() {
+    if (_ctrl.value >= 0.85) {
+      widget.onActivate();
+      _ctrl.animateTo(0.0, curve: Curves.easeIn);
+    } else if (_ctrl.value < 0.1) {
+      _ctrl.animateTo(1.0, curve: Curves.easeOut).then((_) {
+        Future.delayed(const Duration(seconds: 2), () {
+          if (mounted && _ctrl.value >= 0.9) {
+            _ctrl.animateTo(0.0, curve: Curves.easeIn);
+          }
+        });
+      });
+    } else {
+      _ctrl.animateTo(1.0, curve: Curves.easeOut).then((_) {
+        widget.onActivate();
+        _ctrl.animateTo(0.0, curve: Curves.easeIn);
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final primary = Theme.of(context).colorScheme.primary;
+    return GestureDetector(
+      onTap: _onTap,
+      onHorizontalDragUpdate: _onDragUpdate,
+      onHorizontalDragEnd: _onDragEnd,
+      child: AnimatedBuilder(
+        animation: _ctrl,
+        builder: (context, child) {
+          final extra = widget.expandWidth * _ctrl.value;
+          final w = _iconSize + extra;
+          final textOpacity = ((extra - 30) / 80).clamp(0.0, 1.0);
+          return Container(
+            width: w,
+            height: _iconSize,
+            clipBehavior: Clip.hardEdge,
+            decoration: BoxDecoration(
+              color: primary,
+              borderRadius: BorderRadius.circular(_iconSize / 2),
+              boxShadow: [
+                BoxShadow(
+                  color: primary.withValues(alpha: 0.35),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: widget.expandsRight
+                ? Row(
+                    children: [
+                      const SizedBox(width: 16),
+                      Icon(widget.icon, color: Colors.white, size: 24),
+                      if (extra > 10) ...[
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.only(right: 16),
+                            child: Opacity(
+                              opacity: textOpacity,
+                              child: Text(
+                                widget.label,
+                                maxLines: 1,
+                                overflow: TextOverflow.clip,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ] else
+                        const SizedBox(width: 16),
+                    ],
+                  )
+                : Row(
+                    children: [
+                      if (extra > 10) ...[
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.only(left: 16),
+                            child: Opacity(
+                              opacity: textOpacity,
+                              child: Text(
+                                widget.label,
+                                maxLines: 1,
+                                overflow: TextOverflow.clip,
+                                textAlign: TextAlign.right,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                      ] else
+                        const SizedBox(width: 16),
+                      Icon(widget.icon, color: Colors.white, size: 24),
+                      const SizedBox(width: 16),
+                    ],
+                  ),
+          );
+        },
       ),
     );
   }

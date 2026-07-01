@@ -14,6 +14,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../data/datasources/remote/garita_datasource.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/notificacion_provider.dart';
+import '../../providers/profile_provider.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -39,18 +40,16 @@ class HomeScreen extends ConsumerWidget {
       child: isGuardia
           ? _GuardiaHome(profile: profile)
           : Scaffold(
-              appBar: AppBar(
-                title: Text(profile?.nombre ?? 'Parcelux'),
-                actions: [
-                  _ProfileSwitcherButton(currentProfile: profile),
-                ],
-              ),
               body: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
+                padding: EdgeInsets.fromLTRB(16, MediaQuery.of(context).padding.top + 16, 16, 16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _WelcomeHeader(nombre: profile?.usuarioNombre ?? ''),
+                    _WelcomeHeader(
+                      nombre: profile?.usuarioNombre ?? '',
+                      proyecto: profile?.nombre,
+                      profile: profile,
+                    ),
                     const SizedBox(height: 20),
                     _QrCard().animate().fadeIn(delay: 100.ms).slideY(begin: 0.1),
                     const SizedBox(height: 24),
@@ -104,45 +103,18 @@ class HomeScreen extends ConsumerWidget {
 
 // ── Profile switcher button ───────────────────────────────────────────────────
 
-class _ProfileSwitcherButton extends ConsumerWidget {
-  final TenantProfile? currentProfile;
-  const _ProfileSwitcherButton({this.currentProfile});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: GestureDetector(
-        onTap: () => _showSwitcher(context, ref),
-        child: _ProfileAvatar(profile: currentProfile, size: 34, isActive: true),
-      ),
-    );
-  }
-
-  void _showSwitcher(BuildContext context, WidgetRef ref) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => const _ProfileSwitcherSheet(),
-    );
-  }
-}
-
 // ── Profile switcher sheet ────────────────────────────────────────────────────
 
-class _ProfileSwitcherSheet extends ConsumerStatefulWidget {
-  const _ProfileSwitcherSheet();
+class ProfileSwitcherSheet extends ConsumerStatefulWidget {
+  const ProfileSwitcherSheet();
 
   @override
-  ConsumerState<_ProfileSwitcherSheet> createState() =>
-      _ProfileSwitcherSheetState();
+  ConsumerState<ProfileSwitcherSheet> createState() =>
+      ProfileSwitcherSheetState();
 }
 
-class _ProfileSwitcherSheetState
-    extends ConsumerState<_ProfileSwitcherSheet> {
+class ProfileSwitcherSheetState
+    extends ConsumerState<ProfileSwitcherSheet> {
   String? _switchingKey; // storageKey currently being verified
 
   @override
@@ -150,53 +122,66 @@ class _ProfileSwitcherSheetState
     final profiles = SessionStorage.allProfiles();
     final activeKey = SessionStorage.activeHost;
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
+    final bottomPad = MediaQuery.of(context).padding.bottom + 16;
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.75,
+      ),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(20, 16, 20, bottomPad),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 16),
-          Text('Mis proyectos',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleMedium
-                  ?.copyWith(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 16),
-          ...profiles.map((p) {
-            final isActive = p.storageKey == activeKey;
-            final isLoading = _switchingKey == p.storageKey;
-            return _ProfileCard(
-              profile: p,
-              isActive: isActive,
-              isLoading: isLoading,
-              onSwitch: isLoading ? null : () => _switchTo(p),
-              onLogout: () => _logout(context, p),
-            ).animate().fadeIn().slideX(begin: -0.05);
-          }),
-          const SizedBox(height: 8),
-          OutlinedButton.icon(
-            onPressed: () {
-              Navigator.pop(context);
-              context.go(AppRoutes.country);
-            },
-            icon: const Icon(Icons.add_rounded),
-            label: const Text('Agregar proyecto'),
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size(double.infinity, 44),
+            const SizedBox(height: 16),
+            Text('Mis proyectos',
+                style: Theme.of(context)
+                    .textTheme
+                    .titleMedium
+                    ?.copyWith(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+            Flexible(
+              child: ListView(
+                shrinkWrap: true,
+                children: [
+                  ...profiles.map((p) {
+                    final isActive = p.storageKey == activeKey;
+                    final isLoading = _switchingKey == p.storageKey;
+                    return _ProfileCard(
+                      profile: p,
+                      isActive: isActive,
+                      isLoading: isLoading,
+                      onSwitch: isLoading ? null : () => _switchTo(p),
+                      onLogout: () => _logout(context, p),
+                    ).animate().fadeIn().slideX(begin: -0.05);
+                  }),
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      context.go(AppRoutes.country);
+                    },
+                    icon: const Icon(Icons.add_rounded),
+                    label: const Text('Agregar proyecto'),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(double.infinity, 44),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -204,54 +189,46 @@ class _ProfileSwitcherSheetState
   Future<void> _switchTo(TenantProfile profile) async {
     setState(() => _switchingKey = profile.storageKey);
 
-    final error = await _verifyProfile(profile);
+    final expired = await _verifyProfile(profile);
 
     if (!mounted) return;
 
-    if (error != null) {
-      setState(() => _switchingKey = null);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(children: [
-            const Icon(Icons.warning_amber_rounded,
-                color: Colors.white, size: 18),
-            const SizedBox(width: 8),
-            Expanded(child: Text(error)),
-          ]),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: Colors.orange.shade700,
-        ),
-      );
+    if (expired) {
+      // Sesión inválida — limpiar y redirigir al login de ese proyecto
+      await SessionStorage.clearProfile(profile.storageKey);
+      if (!mounted) return;
+      Navigator.pop(context);
+      context.push(AppRoutes.login, extra: profile.toTenantOption());
       return;
     }
 
     await SessionStorage.switchProfile(profile.storageKey);
-    // Invalidate reactive provider → HomeScreen rebuilds with new profile
+    // Invalidate reactive providers → HomeScreen y ProfileScreen reconstruyen
     ref.invalidate(activeProfileProvider);
+    ref.invalidate(profileProvider);
+    ref.invalidate(notificacionContadorProvider);
     if (!mounted) return;
     Navigator.pop(context);
   }
 
-  // Verify using the sheet's own ref — avoids the autoDispose issue on AuthNotifier.
-  Future<String?> _verifyProfile(TenantProfile profile) async {
+  // Retorna true si la sesión es inválida (debe redirigir a login).
+  // Retorna false si es válida o si hay un error de red (no queremos borrar sesiones por red caída).
+  Future<bool> _verifyProfile(TenantProfile profile) async {
+    final token = await SessionStorage.getJwt(profile.storageKey);
+    if (token == null) return true;
     try {
-      final token = await SessionStorage.getJwt(profile.storageKey);
-      if (token == null) return 'Sin sesión guardada.';
-      final repo = ref.read(authRepositoryProvider);
-      await repo.me(
+      await ref.read(authRepositoryProvider).me(
         profile.host,
         token: token,
         virtualProjectSlug: profile.virtualProjectSlug,
       );
-      return null;
+      return false;
     } on DioException catch (e) {
       final status = e.response?.statusCode;
-      if (status == 401 || status == 403) return 'Tu sesión expiró en ${profile.nombre}.';
-      if (status == 404) return '${profile.nombre} ya no está disponible.';
-      return 'Sin conexión. Inténtalo más tarde.';
-    } catch (e) {
-      debugPrint('[verifyProfile] $e');
-      return 'No se pudo verificar la sesión.';
+      // Solo 401/403 indica sesión inválida — error de red deja pasar
+      return status == 401 || status == 403;
+    } catch (_) {
+      return false;
     }
   }
 
@@ -529,28 +506,49 @@ class _NotifIcon extends StatelessWidget {
 
 // ── Existing widgets ──────────────────────────────────────────────────────────
 
-class _WelcomeHeader extends StatelessWidget {
+class _WelcomeHeader extends ConsumerWidget {
   final String nombre;
-  const _WelcomeHeader({required this.nombre});
+  final String? proyecto;
+  final TenantProfile? profile;
+  const _WelcomeHeader({required this.nombre, this.proyecto, this.profile});
 
   @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Text(
-          'Hola, ${nombre.split(' ').first} 👋',
-          style: Theme.of(context)
-              .textTheme
-              .headlineSmall
-              ?.copyWith(fontWeight: FontWeight.bold),
-        ),
-        Text(
-          'Bienvenido a tu portal',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Hola, ${nombre.split(' ').first} 👋',
+                style: Theme.of(context)
+                    .textTheme
+                    .headlineSmall
+                    ?.copyWith(fontWeight: FontWeight.bold),
               ),
+              Text(
+                'Bienvenido a ${proyecto ?? 'tu portal'}',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+              ),
+            ],
+          ),
         ),
+        if (profile != null)
+          GestureDetector(
+            onTap: () => showModalBottomSheet(
+              context: context,
+              isScrollControlled: true,
+              shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              builder: (_) => const ProfileSwitcherSheet(),
+            ),
+            child: _ProfileAvatar(profile: profile, size: 52, isActive: true),
+          ),
       ],
     ).animate().fadeIn().slideY(begin: -0.1);
   }
@@ -708,12 +706,6 @@ class _GuardiaHome extends ConsumerWidget {
         );
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(profile?.nombre ?? 'Parcelux'),
-        actions: [
-          _ProfileSwitcherButton(currentProfile: profile),
-        ],
-      ),
       bottomNavigationBar: NavigationBar(
         destinations: [
           const NavigationDestination(
@@ -746,11 +738,11 @@ class _GuardiaHome extends ConsumerWidget {
         },
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.fromLTRB(16, MediaQuery.of(context).padding.top + 16, 16, 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _WelcomeHeader(nombre: profile?.usuarioNombre ?? ''),
+            _WelcomeHeader(nombre: profile?.usuarioNombre ?? '', proyecto: profile?.nombre, profile: profile),
             const SizedBox(height: 20),
 
             // Banner principal: Validar acceso QR

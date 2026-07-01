@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/storage/session_storage.dart';
 import '../../../domain/entities/usuario.dart';
 import '../../providers/profile_provider.dart';
+import '../home/home_screen.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -41,7 +42,7 @@ class ProfileScreen extends ConsumerWidget {
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              _AvatarHeader(user: user, tenantColor: tenantProfile?.primaryColor)
+              _AvatarHeader(user: user, tenantColor: tenantProfile?.primaryColor, tenantNombre: tenantProfile?.nombre)
                   .animate()
                   .fadeIn()
                   .slideY(begin: -0.1),
@@ -58,6 +59,10 @@ class ProfileScreen extends ConsumerWidget {
               _ChangePasswordTile()
                   .animate()
                   .fadeIn(delay: 240.ms),
+              const SizedBox(height: 8),
+              _SwitchProfileTile()
+                  .animate()
+                  .fadeIn(delay: 300.ms),
             ],
           );
         },
@@ -71,7 +76,8 @@ class ProfileScreen extends ConsumerWidget {
 class _AvatarHeader extends StatelessWidget {
   final Usuario user;
   final String? tenantColor;
-  const _AvatarHeader({required this.user, this.tenantColor});
+  final String? tenantNombre;
+  const _AvatarHeader({required this.user, this.tenantColor, this.tenantNombre});
 
   @override
   Widget build(BuildContext context) {
@@ -117,6 +123,16 @@ class _AvatarHeader extends StatelessWidget {
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
         ),
+        if (tenantNombre != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            tenantNombre!,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: primary,
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
+        ],
       ],
     );
   }
@@ -348,6 +364,30 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
                   : const Text('Guardar cambios'),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Switch profile tile ───────────────────────────────────────────────────────
+
+class _SwitchProfileTile extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: ListTile(
+        leading: Icon(Icons.swap_horiz_rounded,
+            color: Theme.of(context).colorScheme.primary),
+        title: const Text('Cambiar proyecto'),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () => showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          builder: (_) => const ProfileSwitcherSheet(),
         ),
       ),
     );

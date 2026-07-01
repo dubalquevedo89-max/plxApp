@@ -50,3 +50,8 @@ google-services.json
 GoogleService-Info.plist
 firebase.json
 lib/firebase_options.dart
+
+# Android signing
+key.properties
+*.jks
+*.keystore

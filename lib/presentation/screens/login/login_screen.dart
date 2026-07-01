@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -59,11 +60,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         : t.host;
     final jwt = await SessionStorage.getJwt(key);
     if (jwt != null && mounted) {
-      await SessionStorage.switchProfile(key);
-      await _goHome();
-      return;
+      try {
+        await SessionStorage.switchProfile(key);
+        await _goHome();
+        return;
+      } catch (_) {
+        // JWT inválido o rechazado — limpiar y mostrar formulario de login
+        await SessionStorage.clearProfile(key);
+      }
     }
-    _tryBiometricLogin();
+    if (mounted) _tryBiometricLogin();
   }
 
   Future<void> _tryBiometricLogin() async {
@@ -101,9 +107,46 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         );
     if (!mounted) return;
     final state = ref.read(authProvider);
-    if (state.hasValue && state.value != null) {
-      await _goHome();
+    if (state.hasError) {
+      final err = state.error;
+      String msg = 'Email o contraseña incorrectos.';
+      if (err is DioException) {
+        final detail = err.response?.data?['detail'];
+        if (detail is String && detail.isNotEmpty) msg = detail;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(msg),
+          backgroundColor: Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
     }
+    if (state.hasValue && state.value != null) {
+      try {
+        await _goHome();
+      } catch (_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No se pudo verificar la sesión. Intenta de nuevo.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  void _showRecoverySheet(BuildContext context, TenantOption tenant) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => _RecoverySheet(tenant: tenant),
+    );
   }
 
   @override
@@ -173,6 +216,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     Center(
                       child: Text(
                         t.ubicacionTexto!,
+                        textAlign: TextAlign.center,
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                               color: Theme.of(context)
                                   .colorScheme
@@ -213,7 +257,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   Align(
                     alignment: Alignment.centerRight,
                     child: TextButton(
-                      onPressed: () {},
+                      onPressed: () => _showRecoverySheet(context, t),
                       child: const Text('¿Olvidaste tu contraseña?'),
                     ),
                   ),
@@ -452,4 +496,118 @@ class _LogoFallback extends StatelessWidget {
         color: primary.withValues(alpha: 0.12),
         child: Icon(Icons.location_city_rounded, color: primary, size: 42),
       );
+}
+
+// ── Recovery sheet ────────────────────────────────────────────────────────────
+
+class _RecoverySheet extends ConsumerStatefulWidget {
+  final TenantOption tenant;
+  const _RecoverySheet({required this.tenant});
+
+  @override
+  ConsumerState<_RecoverySheet> createState() => _RecoverySheetState();
+}
+
+class _RecoverySheetState extends ConsumerState<_RecoverySheet> {
+  final _formKey = GlobalKey<FormState>();
+  final _emailCtrl = TextEditingController();
+  bool _loading = false;
+  bool _sent = false;
+
+  @override
+  void dispose() {
+    _emailCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _loading = true);
+    try {
+      await ref.read(authRepositoryProvider).solicitarRecuperacion(
+            _emailCtrl.text.trim(),
+            widget.tenant.host,
+            virtualProjectSlug: widget.tenant.virtualProjectSlug,
+          );
+      if (mounted) setState(() => _sent = true);
+    } catch (_) {
+      // El backend siempre responde 200 por seguridad — si hay error de red mostramos igual
+      if (mounted) setState(() => _sent = true);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(24, 16, 24, MediaQuery.of(context).viewInsets.bottom + 32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 40, height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade300,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 20),
+          if (_sent) ...[
+            const Icon(Icons.mark_email_read_outlined, size: 52, color: Colors.green),
+            const SizedBox(height: 16),
+            Text('Revisa tu correo',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Text(
+              'Si tu correo está registrado, recibirás un enlace para restablecer tu contraseña.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+            ),
+            const SizedBox(height: 24),
+            FilledButton(
+              onPressed: () => Navigator.pop(context),
+              style: FilledButton.styleFrom(minimumSize: const Size(double.infinity, 46)),
+              child: const Text('Entendido'),
+            ),
+          ] else ...[
+            Text('Recuperar contraseña',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Text(
+              'Ingresa tu correo y te enviaremos un enlace para restablecer tu contraseña.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+            ),
+            const SizedBox(height: 20),
+            Form(
+              key: _formKey,
+              child: TextFormField(
+                controller: _emailCtrl,
+                keyboardType: TextInputType.emailAddress,
+                decoration: const InputDecoration(
+                  labelText: 'Correo electrónico',
+                  prefixIcon: Icon(Icons.email_outlined),
+                ),
+                validator: (v) => v != null && v.contains('@') ? null : 'Ingresa un correo válido',
+              ),
+            ),
+            const SizedBox(height: 24),
+            FilledButton(
+              onPressed: _loading ? null : _submit,
+              style: FilledButton.styleFrom(minimumSize: const Size(double.infinity, 46)),
+              child: _loading
+                  ? const SizedBox(height: 20, width: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Text('Enviar enlace'),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 }

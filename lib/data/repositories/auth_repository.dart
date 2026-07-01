@@ -100,49 +100,50 @@ class AuthRepository {
       _ds.changePassword(
           passwordActual: passwordActual, passwordNuevo: passwordNuevo);
 
-  Future<void> solicitarRecuperacion(String email) =>
-      _ds.solicitarRecuperacion(email);
+  Future<void> solicitarRecuperacion(String email, String host, {String? virtualProjectSlug}) =>
+      _ds.solicitarRecuperacion(email, host, virtualProjectSlug: virtualProjectSlug);
 
   Future<String?> getToken(String host) => SessionStorage.getJwt(host);
 
   Future<void> logout(String host) => SessionStorage.clearProfile(host);
 
   /// Refresca el perfil activo desde /me y actualiza Hive con el rol actual.
+  /// Relanza el error si la sesión es inválida, para que el caller decida
+  /// (p.ej. limpiar la sesión y volver al login) en vez de navegar a Home
+  /// con una sesión rota.
   Future<void> refreshActiveProfile() async {
     final profile = SessionStorage.activeProfile;
     if (profile == null) return;
     final token = await SessionStorage.getJwt(profile.storageKey);
     if (token == null) return;
-    try {
-      final me = await _ds.me(
-        profile.host,
-        token: token,
+    final me = await _ds.me(
+      profile.host,
+      token: token,
+      virtualProjectSlug: profile.virtualProjectSlug,
+    );
+    final user = me.toEntity();
+    await SessionStorage.saveProfile(
+      TenantProfile(
+        slug: profile.slug,
+        nombre: profile.nombre,
+        host: profile.host,
+        primaryColor: profile.primaryColor,
+        logoUrl: profile.logoUrl,
+        usuarioNombre: user.nombre,
+        usuarioEmail: user.email,
+        usuarioRol: user.rol,
+        apiKeyGarita: profile.apiKeyGarita,
         virtualProjectSlug: profile.virtualProjectSlug,
-      );
-      final user = me.toEntity();
-      await SessionStorage.saveProfile(
-        TenantProfile(
-          slug: profile.slug,
-          nombre: profile.nombre,
-          host: profile.host,
-          primaryColor: profile.primaryColor,
-          logoUrl: profile.logoUrl,
-          usuarioNombre: user.nombre,
-          usuarioEmail: user.email,
-          usuarioRol: user.rol,
-          apiKeyGarita: profile.apiKeyGarita,
-          virtualProjectSlug: profile.virtualProjectSlug,
-          parentSlug: profile.parentSlug,
-          residentCode: profile.residentCode,
-        ),
-        token,
-      );
-      // Refrescar resident_code en background (solo residentes)
-      if (user.rol != 'guardia') {
-        _garitaDs.miSolvencia().then((s) {
-          SessionStorage.saveResidentCode(profile.storageKey, s.residentCode);
-        }).catchError((_) {});
-      }
-    } catch (_) {}
+        parentSlug: profile.parentSlug,
+        residentCode: profile.residentCode,
+      ),
+      token,
+    );
+    // Refrescar resident_code en background (solo residentes)
+    if (user.rol != 'guardia') {
+      _garitaDs.miSolvencia().then((s) {
+        SessionStorage.saveResidentCode(profile.storageKey, s.residentCode);
+      }).catchError((_) {});
+    }
   }
 }

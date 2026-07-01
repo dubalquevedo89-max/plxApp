@@ -55,7 +55,9 @@ class _AuthInterceptor extends Interceptor {
       if (options.headers['Host'] == null) {
         if (profile != null) {
           options.headers['Host'] = profile.host;
-          if (profile.virtualProjectSlug != null &&
+          final skipVp = options.extra['no_vp_scope'] == true;
+          if (!skipVp &&
+              profile.virtualProjectSlug != null &&
               options.headers['x-virtual-project-slug'] == null) {
             options.headers['x-virtual-project-slug'] =
                 profile.virtualProjectSlug;
@@ -71,7 +73,9 @@ class _AuthInterceptor extends Interceptor {
     }
 
     final sandbox = dotenv.env['SANDBOX_SLUG'] ?? '';
-    if (sandbox.isNotEmpty) options.headers['x-sandbox-slug'] = sandbox;
+    if (sandbox.isNotEmpty && options.extra['no_sandbox_scope'] != true) {
+      options.headers['x-sandbox-slug'] = sandbox;
+    }
 
     handler.next(options);
   }
