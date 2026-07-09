@@ -20,7 +20,7 @@ class MapDatasource {
       headers['X-Virtual-Project-Slug'] = virtualProjectSlug;
     }
 
-    final res = await _dio.get(path, options: Options(headers: headers));
+    final res = await _dio.get(path, options: Options(headers: headers, extra: {'no_sandbox_scope': true}));
     final raw = res.data as Map<String, dynamic>;
 
     // VP: backend encrypts with the parent urbanización slug (e.g. "tonsupa_estates")

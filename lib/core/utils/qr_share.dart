@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
@@ -27,10 +28,10 @@ Future<void> shareQrFromKey(
   final file = File('${tmp.path}/qr_pase.png');
   await file.writeAsBytes(byteData.buffer.asUint8List());
 
-  await SharePlus.instance.share(
-    ShareParams(
-      files: [XFile(file.path, mimeType: 'image/png')],
-      text: shareText,
-    ),
-  );
+  await SharePlus.instance
+      .share(ShareParams(
+        files: [XFile(file.path, mimeType: 'image/png')],
+        text: shareText,
+      ))
+      .catchError((_) {});
 }

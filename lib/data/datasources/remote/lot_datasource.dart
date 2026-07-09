@@ -22,7 +22,7 @@ class LotDatasource {
 
     final res = await _dio.get(
       '/api/solares/$lotId',
-      options: Options(headers: headers),
+      options: Options(headers: headers, extra: {'no_sandbox_scope': true}),
     );
     return LotDetailModel.fromJson(res.data as Map<String, dynamic>).toEntity();
   }

@@ -50,11 +50,14 @@ class ReservaDatasource {
   }) async {
     final res = await _dio.post(
       '/api/reservas/$lotId/pre-reservar',
-      options: Options(headers: {
-        'Host': host,
-        'Authorization': 'Bearer $token',
-        'x-virtual-project-slug': virtualProjectSlug,
-      }),
+      options: Options(
+        headers: {
+          'Host': host,
+          'Authorization': 'Bearer $token',
+          'x-virtual-project-slug': virtualProjectSlug,
+        },
+        extra: {'no_sandbox_scope': true},
+      ),
     );
     final data = res.data as Map<String, dynamic>;
     return ReservaResult(

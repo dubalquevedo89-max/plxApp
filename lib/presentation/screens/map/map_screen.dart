@@ -5,6 +5,8 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../core/storage/session_storage.dart';
+import '../../../core/utils/share_url.dart';
 import '../../../domain/entities/lot_detail.dart';
 import '../../../domain/entities/tenant_option.dart';
 import '../../providers/lot_provider.dart';
@@ -106,6 +108,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   bool _searchOpen = false;
   String _searchQuery = '';
   String _lastZoomedQuery = '';
+  String _lastFilterHash = '';
 
   @override
   void dispose() {
@@ -239,6 +242,14 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             _lastZoomedQuery = '';
             WidgetsBinding.instance.addPostFrameCallback(
                 (_) => _zoomToFit(allFeatures));
+          }
+
+          // Auto-fit cuando cambian los filtros de estado
+          final filterHash = (_activeStatuses.toList()..sort()).join(',');
+          if (filterHash != _lastFilterHash) {
+            _lastFilterHash = filterHash;
+            WidgetsBinding.instance.addPostFrameCallback(
+                (_) => _zoomToFit(filtered.isNotEmpty ? filtered : allFeatures));
           }
 
           return Stack(
@@ -499,6 +510,16 @@ class _LotPanel extends ConsumerWidget {
                     backgroundColor: color,
                     padding: EdgeInsets.zero,
                     materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.share_rounded),
+                    tooltip: 'Compartir lote',
+                    onPressed: () {
+                      final profile = SessionStorage.activeProfile;
+                      if (profile != null) {
+                        shareLote(profile, feature.codigo);
+                      }
+                    },
                   ),
                   IconButton(onPressed: onClose, icon: const Icon(Icons.close)),
                 ],

@@ -45,7 +45,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Image.asset(
-              'assets/images/parcelux.png',
+              'assets/images/icon_fa.png',
               width: 100,
               height: 100,
             )

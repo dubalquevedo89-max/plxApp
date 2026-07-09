@@ -87,12 +87,12 @@ dev_dependencies:
 flutter_launcher_icons:
   android: "launcher_icon"
   ios: true
-  image_path: "assets/images/parcelux.png"
+  image_path: "assets/images/icon_wb.png"
   min_sdk_android: 21
   remove_alpha_ios: true
-  background_color_ios: "#D4AF37"
-  adaptive_icon_background: "#D4AF37"
-  adaptive_icon_foreground: "assets/images/parcelux.png"
+  background_color_ios: "#CFA941"
+  adaptive_icon_background: "#CFA941"
+  adaptive_icon_foreground: "assets/images/icon_fa.png"
   web:
     generate: false
 

@@ -338,7 +338,7 @@ class _QrDialogState extends State<_QrDialog> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('No se pudo compartir: $e')),
+          SnackBar(content: Text('Error: $e')),
         );
       }
     } finally {

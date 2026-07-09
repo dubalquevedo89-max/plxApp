@@ -37,7 +37,24 @@ class QrWithLogo extends StatelessWidget {
       ),
     );
 
-    if (logoUrl == null || logoUrl!.isEmpty) return qr;
+    final logoWidget = (logoUrl != null && logoUrl!.isNotEmpty)
+        ? CachedNetworkImage(
+            imageUrl: logoUrl!,
+            fit: BoxFit.contain,
+            fadeInDuration: const Duration(milliseconds: 150),
+            placeholder: (_, _) => Image.asset(
+              'assets/images/icon_wb.png',
+              fit: BoxFit.contain,
+            ),
+            errorWidget: (_, _, _) => Image.asset(
+              'assets/images/icon_wb.png',
+              fit: BoxFit.contain,
+            ),
+          )
+        : Image.asset(
+            'assets/images/icon_wb.png',
+            fit: BoxFit.contain,
+          );
 
     return Stack(
       alignment: Alignment.center,
@@ -60,17 +77,7 @@ class QrWithLogo extends StatelessWidget {
           padding: EdgeInsets.all(innerPad),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(radius * 0.7),
-            child: CachedNetworkImage(
-              imageUrl: logoUrl!,
-              fit: BoxFit.contain,
-              fadeInDuration: const Duration(milliseconds: 150),
-              placeholder: (_, _) => const SizedBox.shrink(),
-              errorWidget: (_, _, _) => Icon(
-                Icons.apartment_rounded,
-                size: logoSize * 0.5,
-                color: Colors.grey.shade400,
-              ),
-            ),
+            child: logoWidget,
           ),
         ),
       ],

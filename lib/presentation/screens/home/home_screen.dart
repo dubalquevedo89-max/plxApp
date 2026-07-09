@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../core/config/app_router.dart';
+import '../../../core/utils/share_url.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/network/tenant_profile.dart';
 import '../../../core/storage/garita_snapshot_storage.dart';
@@ -537,7 +538,12 @@ class _WelcomeHeader extends ConsumerWidget {
             ],
           ),
         ),
-        if (profile != null)
+        if (profile != null) ...[
+          IconButton(
+            icon: const Icon(Icons.share_rounded),
+            tooltip: 'Compartir proyecto',
+            onPressed: () => shareProject(profile!),
+          ),
           GestureDetector(
             onTap: () => showModalBottomSheet(
               context: context,
@@ -549,6 +555,7 @@ class _WelcomeHeader extends ConsumerWidget {
             ),
             child: _ProfileAvatar(profile: profile, size: 52, isActive: true),
           ),
+        ],
       ],
     ).animate().fadeIn().slideY(begin: -0.1);
   }
