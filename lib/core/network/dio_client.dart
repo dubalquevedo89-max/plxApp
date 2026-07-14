@@ -20,14 +20,14 @@ Dio dioClient(Ref ref) {
     headers: {'Content-Type': 'application/json'},
   ));
 
+  dio.interceptors.add(_AuthInterceptor(dio));
+
   dio.interceptors.add(LogInterceptor(
     requestBody: true,
     responseBody: true,
     requestHeader: true,
     logPrint: (o) => debugPrint('[DIO] $o'),
   ));
-
-  dio.interceptors.add(_AuthInterceptor(dio));
 
   return dio;
 }
@@ -51,6 +51,14 @@ class _AuthInterceptor extends Interceptor {
       if (jwt != null && options.headers['Authorization'] == null) {
         options.headers['Authorization'] = 'Bearer $jwt';
       }
+
+      // Rewrite baseUrl to the tenant's actual host so requests go to the
+      // correct subdomain (e.g. tonsupa.plxmap.com) instead of plxmap.com.
+      final tenantHost = profile?.host ?? key;
+      if (!options.uri.host.contains(tenantHost)) {
+        options.baseUrl = 'https://$tenantHost';
+      }
+
       // Only inject Host/VP if not already set by the datasource
       if (options.headers['Host'] == null) {
         if (profile != null) {

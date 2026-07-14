@@ -2,6 +2,8 @@ import 'package:dio/dio.dart';
 import '../../../domain/entities/documento.dart';
 import 'dart:io';
 
+final _kOpts = Options(extra: {'no_sandbox_scope': true});
+
 class DocumentoDatasource {
   final Dio _dio;
   const DocumentoDatasource(this._dio);
@@ -10,12 +12,13 @@ class DocumentoDatasource {
     final res = await _dio.get(
       '/api/portal/documentos',
       queryParameters: {'reserva_id': reservaId},
+      options: _kOpts,
     );
     return (res.data as List).map(_fromJson).toList();
   }
 
   Future<List<Documento>> listarMisUploads() async {
-    final res = await _dio.get('/api/portal/documentos/mis-uploads');
+    final res = await _dio.get('/api/portal/documentos/mis-uploads', options: _kOpts);
     return (res.data as List).map(_fromJson).toList();
   }
 
@@ -34,7 +37,7 @@ class DocumentoDatasource {
       'descripcion': descripcion,
       'reserva_id': reservaId,
     });
-    await _dio.post('/api/portal/documentos/subir', data: formData);
+    await _dio.post('/api/portal/documentos/subir', data: formData, options: _kOpts);
   }
 
   String _tipoToApi(TipoDocumento t) => switch (t) {
@@ -45,7 +48,7 @@ class DocumentoDatasource {
       };
 
   Future<String> obtenerUrl(String docId) async {
-    final res = await _dio.get('/api/portal/documentos/$docId/url');
+    final res = await _dio.get('/api/portal/documentos/$docId/url', options: _kOpts);
     return res.data['url'] as String;
   }
 

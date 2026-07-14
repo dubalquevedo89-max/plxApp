@@ -2,13 +2,15 @@ import 'package:dio/dio.dart';
 import '../../../domain/entities/acceso_log.dart';
 import '../../../domain/entities/solvencia.dart';
 
+final _kOpts = Options(extra: {'no_sandbox_scope': true});
+
 class GaritaDatasource {
   final Dio _dio;
   const GaritaDatasource(this._dio);
 
   /// Devuelve la solvencia del residente autenticado (para mostrar en QR).
   Future<Solvencia> miSolvencia() async {
-    final res = await _dio.get('/api/portal/solvencia/mi-propiedad');
+    final res = await _dio.get('/api/portal/solvencia/mi-propiedad', options: _kOpts);
     final d = res.data as Map<String, dynamic>;
     return Solvencia(
       residentCode: d['resident_code'] as String,
@@ -75,6 +77,7 @@ class GaritaDatasource {
     final res = await _dio.get(
       '/api/admin/alicuotas/garita/logs',
       queryParameters: params,
+      options: _kOpts,
     );
     final d = res.data as Map<String, dynamic>;
     return AccesoLogPage(

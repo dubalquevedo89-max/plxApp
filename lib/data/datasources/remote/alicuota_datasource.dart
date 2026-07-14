@@ -10,7 +10,10 @@ class AlicuotaDatasource {
 
   Future<MisPropiedades> getMisPropiedades() async {
     debugPrint('[ALICUOTA] calling /api/portal/alicuotas/mis-propiedades');
-    final res = await _dio.get('/api/portal/alicuotas/mis-propiedades');
+    final res = await _dio.get(
+      '/api/portal/alicuotas/mis-propiedades',
+      options: Options(extra: {'no_sandbox_scope': true}),
+    );
     final data = res.data as Map<String, dynamic>;
 
     final solaresList = (data['solares'] as List)
@@ -38,6 +41,7 @@ class AlicuotaDatasource {
         if (desde != null) 'desde': _fmt(desde),
         if (hasta != null) 'hasta': _fmt(hasta),
       },
+      options: Options(extra: {'no_sandbox_scope': true}),
     );
     final data = res.data as Map<String, dynamic>;
     final cobros = (data['cobros'] as List)
@@ -59,6 +63,7 @@ class AlicuotaDatasource {
     final res = await _dio.post(
       '/api/portal/alicuotas/comprobantes/subir',
       data: formData,
+      options: Options(extra: {'no_sandbox_scope': true}),
     );
     return (res.data as Map<String, dynamic>)['comprobante_url'] as String;
   }
@@ -76,6 +81,7 @@ class AlicuotaDatasource {
         'transaccion_referencia': transaccionReferencia,
         'comprobante_url': comprobanteUrl,
       },
+      options: Options(extra: {'no_sandbox_scope': true}),
     );
   }
 

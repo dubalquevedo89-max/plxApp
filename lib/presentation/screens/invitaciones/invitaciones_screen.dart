@@ -26,6 +26,7 @@ class InvitacionesScreen extends ConsumerWidget {
       body: async.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => _ErrorView(
+            error: e,
             onRetry: () => ref.invalidate(invitacionesProvider)),
         data: (invs) => invs.isEmpty
             ? const _EmptyView()
@@ -336,9 +337,10 @@ class _QrDialogState extends State<_QrDialog> {
             'Pase de acceso para ${widget.inv.nombreInvitado} · Parcelux',
       );
     } catch (e) {
-      if (mounted) {
+      final msg = e.toString();
+      if (mounted && !msg.contains('result') && !msg.contains('LateInitialization')) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
+          SnackBar(content: Text('No se pudo compartir: $e')),
         );
       }
     } finally {
@@ -428,6 +430,7 @@ class _CrearInvitacionSheetState extends State<_CrearInvitacionSheet> {
   DateTime _inicio = DateTime.now();
   DateTime _fin = DateTime.now().add(const Duration(hours: 8));
   bool _loading = false;
+  String? _errorMsg;
 
   @override
   void dispose() {
@@ -503,6 +506,29 @@ class _CrearInvitacionSheetState extends State<_CrearInvitacionSheet> {
                 if (dt != null) setState(() => _fin = dt);
               },
             ),
+            if (_errorMsg != null) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.red.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.error_outline, color: Colors.red.shade700, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _errorMsg!,
+                        style: TextStyle(color: Colors.red.shade700, fontSize: 13),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 20),
             SizedBox(
               width: double.infinity,
@@ -543,6 +569,7 @@ class _CrearInvitacionSheetState extends State<_CrearInvitacionSheet> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    setState(() => _errorMsg = null);
     if (_fin.isBefore(_inicio)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -569,17 +596,7 @@ class _CrearInvitacionSheetState extends State<_CrearInvitacionSheet> {
         );
       }
     } catch (e) {
-      if (mounted) {
-        final msg = _friendlyError(e);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(msg),
-            backgroundColor: Colors.red.shade700,
-            behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 5),
-          ),
-        );
-      }
+      if (mounted) setState(() => _errorMsg = _friendlyError(e));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -671,21 +688,42 @@ class _EmptyView extends StatelessWidget {
 
 class _ErrorView extends StatelessWidget {
   final VoidCallback onRetry;
-  const _ErrorView({required this.onRetry});
+  final Object error;
+  const _ErrorView({required this.onRetry, required this.error});
+
+  String _message() {
+    if (error is DioException) {
+      final dio = error as DioException;
+      final data = dio.response?.data;
+      if (data is Map && data['detail'] != null) return data['detail'].toString();
+      final code = dio.response?.statusCode;
+      if (code == 400) return 'Solicitud incorrecta (400). Contacta al administrador.';
+      if (code == 401) return 'Sesión expirada. Vuelve a iniciar sesión.';
+      if (code == 403) return 'No tienes permiso para ver invitaciones.';
+      if (code != null) return 'Error del servidor ($code).';
+    }
+    return 'No se pudieron cargar las invitaciones.';
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.error_outline, size: 48, color: Colors.red),
-          const SizedBox(height: 12),
-          const Text('No se pudieron cargar las invitaciones'),
-          const SizedBox(height: 16),
-          FilledButton(
-              onPressed: onRetry, child: const Text('Reintentar')),
-        ],
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(32, 48, 32, 32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 48, color: Colors.red),
+            const SizedBox(height: 12),
+            Text(
+              _message(),
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 15),
+            ),
+            const SizedBox(height: 16),
+            FilledButton(onPressed: onRetry, child: const Text('Reintentar')),
+          ],
+        ),
       ),
     );
   }

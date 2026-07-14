@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
@@ -10,15 +9,11 @@ Future<void> shareQrFromKey(
   GlobalKey repaintKey, {
   String shareText = 'Pase QR',
 }) async {
-  // Espera que el frame actual termine de pintarse
-  await Future.delayed(const Duration(milliseconds: 50));
+  await Future.delayed(const Duration(milliseconds: 400));
 
   final boundary = repaintKey.currentContext?.findRenderObject()
       as RenderRepaintBoundary?;
   if (boundary == null) throw Exception('QR no encontrado en pantalla');
-  if (boundary.debugNeedsPaint) {
-    throw Exception('El QR aún no se ha pintado');
-  }
 
   final image = await boundary.toImage(pixelRatio: 3.0);
   final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
@@ -28,10 +23,14 @@ Future<void> shareQrFromKey(
   final file = File('${tmp.path}/qr_pase.png');
   await file.writeAsBytes(byteData.buffer.asUint8List());
 
-  await SharePlus.instance
-      .share(ShareParams(
+  try {
+    await SharePlus.instance.share(
+      ShareParams(
         files: [XFile(file.path, mimeType: 'image/png')],
         text: shareText,
-      ))
-      .catchError((_) {});
+      ),
+    );
+  } catch (_) {
+    // share_plus bug on Android: thrown when user dismisses the share sheet.
+  }
 }
